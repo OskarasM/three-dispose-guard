@@ -5,9 +5,39 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  test:
+  compatibility:
+    name: Node ${{ matrix.node }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run package:check
+
+  r3f-compatibility:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: React 18 / R3F 8 / Three 0.163
+            generation: legacy
+          - name: React 19 / R3F 9 / current Three
+            generation: current
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -15,7 +45,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run check
+      - name: Install the R3F 8 compatibility set
+        if: matrix.generation == 'legacy'
+        run: npm install --no-save --ignore-scripts --legacy-peer-deps react@18.3.1 react-dom@18.3.1 three@0.163.0 @react-three/fiber@8.18.0 @react-three/test-renderer@8.2.4
+      - run: npx vitest run tests/r3f.test.tsx
+      - run: npm run build
 
   browser:
     runs-on: ubuntu-latest
@@ -26,5 +60,28 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:browser
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Chromium WebGL lifecycle assertions
+        run: npm run test:browser
+      - name: Firefox and WebKit smoke checks
+        run: npm run test:browser:smoke
+      - name: Upload browser traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          if-no-files-found: ignore
+
+  benchmark-data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run benchmark:chart
+      - name: Confirm the committed chart matches the raw dataset
+        run: git diff --exit-code -- docs/benchmark-result.svg

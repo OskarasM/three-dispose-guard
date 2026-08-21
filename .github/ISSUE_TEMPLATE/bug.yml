@@ -1,0 +1,44 @@
+name: Bug report
+description: Report incorrect ownership, disposal or diagnostics behaviour
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thank you for helping make GPU resource ownership safer.
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include the ownership sequence and a small repository or code sample.
+    validations:
+      required: true
+  - type: dropdown
+    id: entry
+    attributes:
+      label: Entry point
+      options:
+        - three-dispose-guard
+        - three-dispose-guard/react
+        - three-dispose-guard/r3f
+        - Research lab
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Dispose Guard, Three.js, React and R3F versions where relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Browser and GPU
+      description: Browser, operating system and GPU renderer when this is a WebGL issue.
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual result
+    validations:
+      required: true
