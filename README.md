@@ -1,202 +1,262 @@
-# Three Dispose Guard
+# three-dispose-guard
 
-Ownership-aware GPU resource disposal for Three.js, with a safe audit mode and tests for the failure that matters: disposing something another component still uses.
+Ownership-aware GPU resource disposal for Three.js and React Three Fiber.
 
-![Measured Three.js resource counts over 50 mount cycles](docs/benchmark-result.svg)
+[![CI](https://github.com/OskarasM/three-dispose-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/OskarasM/three-dispose-guard/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/three-dispose-guard)](https://www.npmjs.com/package/three-dispose-guard)
+[![licence](https://img.shields.io/badge/licence-MIT-d8ff53)](LICENSE)
 
-The committed browser harness ran five 50-cycle trials on 21 August 2026. Every unmanaged trial ended at 401 allocated geometries and textures; every guarded trial ended at the stable one-texture renderer baseline. The observed variance was zero resources across the five runs. These are Three.js resource counts, not GPU bytes.
+Three.js resources are explicit. JavaScript garbage collection does not release their GPU allocations, but disposing every object on unmount is unsafe when another component or cache still owns it.
 
-> Local build status: the package, demo and verification harness are implemented. It has not been published to npm or GitHub from this workspace.
+`three-dispose-guard` makes that ownership visible:
 
-## Why this exists
+- **Owned** resources become disposal candidates after their final user releases them.
+- **Borrowed** resources are tracked but never claimed for disposal.
+- **Protected** resources outlive component users until a cache or pool is explicitly evicted.
+- **Audit mode** reports what would happen without mutating a GPU resource.
 
-JavaScript garbage collection and GPU resource disposal are separate systems. Three.js creates WebGL buffers, textures, framebuffers and shader programs on demand. Dropping the final JavaScript reference does not call `geometry.dispose()`, `texture.dispose()` or the other explicit cleanup APIs.
+The core has zero runtime dependencies. React, Three.js and React Three Fiber are optional peer dependencies used only by their respective entry points.
 
-The tempting fix is a recursive scene traversal on every unmount. That is unsafe. A geometry, material or texture can be shared by several meshes, and loader results are commonly cached. Disposing after the first user unmounts can force a costly re-upload for the user that remains.
+## When to use it
 
-Three Dispose Guard makes that missing ownership model explicit:
+Use the guard when at least one of these is true:
 
-- **owned** scopes are eligible for disposal after their final user releases;
-- **borrowed** scopes are measured, but never become disposal candidates;
-- **protections** keep cache-owned resources alive until explicit eviction;
-- **audit mode**, the default, reports what would be disposed without mutating anything.
+- Two mounted objects share a geometry, material, texture or skeleton.
+- An R3F `useLoader` result must survive zero mounted consumers.
+- A `<primitive>` object is cached or shared outside one component.
+- Imperative Three.js objects move between screens, pools or renderers.
+- You need named, testable disposal diagnostics before enabling cleanup.
+
+Do not add it to every R3F scene by default. React Three Fiber already attempts to dispose declarative objects on unmount. Unique objects with obvious component ownership usually need no additional registry.
 
 ## Install
 
 ```bash
-npm install three-dispose-guard three
+npm install three-dispose-guard
 ```
 
-React is an optional peer dependency and is only needed for the `three-dispose-guard/react` entry point.
+Requirements:
 
-## Vanilla Three.js
+- Node.js 20 or later for development tooling
+- Three.js `0.163` or later
+- React 18 or 19 for React helpers
+- React Three Fiber 8 or 9 for the R3F adapter
 
-Start in audit mode:
+## R3F quick start
+
+```tsx
+import { Suspense } from 'react'
+import { Canvas } from '@react-three/fiber'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { createResourceRegistry } from 'three-dispose-guard'
+import {
+  createR3FResourceCache,
+  GuardedPrimitive,
+  R3FResourceCacheProvider,
+  useGuardedLoader,
+} from 'three-dispose-guard/r3f'
+
+const registry = createResourceRegistry({ mode: 'audit' })
+const cache = createR3FResourceCache({ registry })
+
+function ProductModel() {
+  const gltf = useGuardedLoader(GLTFLoader, '/shoe.glb')
+  return <GuardedPrimitive object={gltf.scene} />
+}
+
+export function ProductViewer() {
+  return (
+    <R3FResourceCacheProvider cache={cache}>
+      <Canvas>
+        <Suspense fallback={null}>
+          <ProductModel />
+        </Suspense>
+      </Canvas>
+    </R3FResourceCacheProvider>
+  )
+}
+
+// Your application cache policy decides when this happens.
+cache.evict(GLTFLoader, '/shoe.glb')
+```
+
+Start in audit mode and inspect `registry.snapshot().events`. Switch to `{ mode: 'dispose' }` only after the recorded ownership matches the application.
+
+`GuardedPrimitive` always supplies `dispose={null}` so R3F does not compete with the registry. Use `cache.preload`, `cache.evict` and `cache.clear`; do not call `useLoader.clear` directly for guarded entries.
+
+## Imperative Three.js
 
 ```ts
 import { createResourceRegistry } from 'three-dispose-guard'
 
-const guard = createResourceRegistry()
-const lease = guard.acquire(model, {
+const registry = createResourceRegistry({ mode: 'dispose' })
+
+const first = registry.acquire(model, {
   ownership: 'owned',
-  label: 'product preview',
+  label: 'product card A',
 })
 
-scene.add(model)
+const second = registry.acquire(model, {
+  ownership: 'owned',
+  label: 'product card B',
+})
 
-// During teardown
-scene.remove(model)
-lease.release()
-
-console.table(guard.snapshot().events)
+first.release()   // shared resources remain usable
+second.release()  // final owner releases, disposal occurs
 ```
 
-Once audit output matches the lifecycle you expect, opt into disposal:
+For an external cache:
 
 ```ts
-const guard = createResourceRegistry({ mode: 'dispose' })
+const cacheProtection = registry.protect(gltf, { label: 'GLTF cache' })
+const mountedUser = registry.acquire(gltf, { ownership: 'borrowed' })
+
+mountedUser.release()      // cache still owns the result
+cacheProtection.release() // eviction permits final disposal
 ```
 
-`release()` is idempotent and also implements `Symbol.dispose`, so it works with explicit resource management in supported toolchains.
+## Measured result
 
-## Shared resources
+The committed reference run was captured on 21 August 2026 using Chromium 151, Windows 10.0.26200 and ANGLE SwiftShader. It discarded a four-cycle warm-up, then ran five independent 50-cycle measurements.
 
-Acquiring the same root twice increments counts for each unique geometry, material, texture, render target and skeleton found below it:
+| Strategy | Final resources in each run | Mean | Variance |
+|---|---:|---:|---:|
+| Unmanaged | 401, 401, 401, 401, 401 | 401 | 0 |
+| Naïve eager disposal | 1, 1, 1, 1, 1 | 1 | 0 |
+| Declarative-style disposal | 1, 1, 1, 1, 1 | 1 | 0 |
+| Dispose Guard | 1, 1, 1, 1, 1 | 1 | 0 |
 
-```ts
-const first = guard.acquire(sharedModel, { ownership: 'owned', label: 'card A' })
-const second = guard.acquire(sharedModel, { ownership: 'owned', label: 'card B' })
+![Five-run benchmark showing unmanaged growth and three flat cleanup strategies](docs/benchmark-result.svg)
 
-first.release()  // nothing is disposed
-second.release() // the final owned references are disposed
-```
+This unique-resource scenario deliberately shows a negative result for the package: when ownership is simple, all explicit cleanup strategies work. The guard's additional value is demonstrated by the shared-handle, cache-reuse, Canvas-remount, churn and in-flight proofs, all of which passed in the captured browser run.
 
-The browser test renders an actual `WebGLTexture`, releases the first mesh, and asserts that the renderer still holds the same GPU handle. It then releases the second mesh and verifies that Three.js removes the handle.
+The signal is `renderer.info.memory.geometries + renderer.info.memory.textures`. It is a Three.js resource count, not a measurement of GPU bytes.
 
-## Cached assets
+## Six reproducible scenarios
 
-A cache is an owner even when no component is mounted. Protect the cached result for the cache lifetime:
+| Scenario | Question answered | Captured result |
+|---|---|---|
+| Unique resources | Does allocation grow when disposal is omitted? | Unmanaged grew; all explicit strategies stayed flat |
+| Two live users | Does the first release destroy shared GPU state? | No, the WebGL texture survived |
+| Loader cache reuse | Can the asset survive zero mounted users and be reused? | Yes, until explicit eviction |
+| Canvas remount | Are scene and renderer lifecycles separated? | Yes, both cleanup responsibilities passed |
+| Shared churn | Does repeated hand-off over-dispose? | No, one final disposal occurred |
+| In-flight eviction | Does a late result return to an evicted cache? | No, the stale result was cleaned |
 
-```ts
-const cacheProtection = guard.protect(gltf.scene, { label: 'catalogue GLTF cache' })
+The complete captured data is available as
+[JSON](benchmarks/results/2026-08-21-windows-chromium.json) and
+[CSV](benchmarks/results/2026-08-21-windows-chromium.csv).
 
-const component = guard.acquire(gltf.scene, { ownership: 'owned' })
-component.release()
-
-// Clear the loader cache first, then release its ownership protection.
-useLoader.clear(GLTFLoader, url)
-cacheProtection.release()
-```
-
-If your code does not control eviction, acquire the result as `borrowed`. The guard will never dispose it.
-
-## React and React Three Fiber
-
-```tsx
-import { ResourceRegistryProvider, useResourceLease } from 'three-dispose-guard/react'
-
-function Model({ scene }: { scene: THREE.Object3D }) {
-  useResourceLease(scene, { ownership: 'owned', label: 'hero model' })
-  return <primitive object={scene} dispose={null} />
-}
-```
-
-Put `dispose={null}` on the tracked R3F subtree. This prevents two ownership systems from both attempting cleanup.
-
-An important correction to the original project hypothesis: current React Three Fiber already attempts to dispose declaratively created objects on unmount. Its documentation also warns that cached assets and objects mounted through `<primitive>` require care. This package is for those explicit ownership boundaries, vanilla Three.js lifecycles, and diagnostics. It does not claim that every R3F unmount leaks.
-
-## What gets collected
-
-`collectDisposableResources()` handles:
-
-- geometries attached to Object3D trees;
-- single materials and material arrays;
-- every texture-valued material property found at runtime;
-- textures nested in shader uniforms, arrays and uniform objects;
-- render targets as owners of their attachments;
-- skeletons used by skinned meshes;
-- common loader result fields such as `scene`, `scenes`, `materials` and `textures`.
-
-The collector uses Three.js runtime type flags rather than a frozen list of texture slot names. This keeps it compatible with current and custom materials without walking unrelated loader metadata.
-
-## Reproduce the measurement
+## Reproduce the study
 
 ```bash
-npm install
-npm run dev
-```
-
-Open the local site and run the 50-cycle test. Each cycle creates and renders four new geometries and four data textures, removes them from the scene, then samples `renderer.info.memory`. The unmanaged and guarded variants use separate WebGL contexts so the first result cannot contaminate the second.
-
-### Recorded environment and result
-
-| Field | Recorded value |
-| --- | --- |
-| Date | 21 August 2026 |
-| Runs | 5 |
-| Cycles per run | 50 |
-| Browser | Chrome 151.0.0.0, Playwright Chromium |
-| Operating system | Windows 10 reported by the browser user agent |
-| Renderer | ANGLE, AMD Radeon Graphics, Direct3D 11 |
-| Fixed workload | 4 geometries and 4 data textures per cycle |
-| Unmanaged final count | 200 geometries, 201 textures, total 401 |
-| Guarded final count | 0 geometries, 1 stable internal texture, total 1 |
-| Across-run variance | 0 resources for both variants |
-
-The result demonstrates application-visible allocation retention in `renderer.info`. It is not a claim about driver bytes or process memory.
-
-For the automated browser assertions:
-
-```bash
+npm ci
 npx playwright install chromium
-npm run test:browser
-```
 
-### What the number means
-
-`renderer.info.memory.geometries` and `.textures` are counts of resources Three.js believes are allocated. They are not bytes, and they are not a direct reading of driver memory. Three.js may retain a small stable set of internal resources for reuse. A flat line after warm-up is the useful signal.
-
-## Why there is no `FinalizationRegistry` cleanup
-
-`FinalizationRegistry` callbacks are delayed and may never run. More importantly, the callback cannot access the collected target unless the registry retains a strong reference, which would prevent collection. It can be useful for warnings about abandoned lease wrappers, but it is not a correctness mechanism for GPU disposal. This implementation keeps cleanup deterministic and explicit.
-
-## Verification
-
-```bash
 npm run check
 npm run test:browser
+npm run benchmark:capture
+npm run benchmark:chart
 ```
 
-The suite covers:
+`npm run benchmark:capture` starts an isolated local Vite server, launches Chromium, discards the warm-up, records five 50-cycle runs and writes host metadata alongside every raw sample. `npm run benchmark:chart` derives the committed SVG from that JSON.
 
-- two owners sharing a texture, with no disposal after the first release;
-- disposal after the final owner releases;
-- cache protection across unmount and remount;
-- borrowed assets that must never be disposed;
-- audit mode that never mutates resources;
-- idempotent release;
-- shader-uniform texture discovery;
-- 1,000 mount and unmount cycles with a flat registry;
-- a browser-level check against the actual WebGL texture handle;
-- a browser leak harness that fails if guarded resource counts grow;
-- horizontal overflow checks at 375, 768, 1024 and 1440 pixels.
+Browser and driver resource behaviour varies. A new environment should produce a new dated result rather than overwrite or generalise the reference capture.
 
-## Limits
+## Public API
 
-- The registry only knows about scopes adopted through its API.
-- A borrowed asset is intentionally never disposed by the registry.
-- Protecting a cache requires an explicit release during eviction.
-- Renderer and controls instances have their own terminal disposal lifecycle and are not scene resources.
-- `ImageBitmap.close()` is not called. Three.js documents that the image may be shared outside the texture, so the application must close it when appropriate.
-- WebGPU resources are outside the v0.1 scope.
+### `three-dispose-guard`
 
-## Sources
+| Export | Purpose |
+|---|---|
+| `createResourceRegistry(options)` | Creates an audit or disposal registry |
+| `registry.acquire(root, options)` | Tracks an owned or borrowed lifetime |
+| `registry.protect(root, options)` | Anchors a cache, pool or external owner |
+| `registry.snapshot()` | Returns immutable counts, scopes and events |
+| `registry.subscribe(listener)` | Observes snapshot changes |
+| `registry.flush()` | Immediately processes microtask-scheduled releases |
+| `collectDisposableResources(root)` | Collects standard Three.js disposable resources |
 
-- [Three.js: How to dispose of objects](https://threejs.org/manual/en/how-to-dispose-of-objects.html)
-- [Three.js: WebGLRenderer.info](https://threejs.org/docs/pages/WebGLRenderer.html#info)
-- [React Three Fiber: automatic disposal](https://github.com/pmndrs/react-three-fiber/blob/master/docs/API/objects.mdx#disposal)
-- [React Three Fiber: useLoader cache warning](https://github.com/pmndrs/react-three-fiber/blob/master/docs/API/hooks.mdx#useloader)
+Imperative leases default to `releasePolicy: 'immediate'`. React helpers default to `'microtask'` so a same-tick Strict Mode effect replay can reclaim the resource before disposal.
+
+### `three-dispose-guard/react`
+
+| Export | Purpose |
+|---|---|
+| `ResourceRegistryProvider` | Supplies one registry to a React subtree |
+| `useResourceLease` | Acquires and releases a stable root with component lifetime |
+| `useResourceRegistry` | Reads the supplied registry |
+| `useResourceSnapshot` | Subscribes with `useSyncExternalStore` |
+
+### `three-dispose-guard/r3f`
+
+| Export | Purpose |
+|---|---|
+| `createR3FResourceCache` | Coordinates registry protection with R3F loader cache keys |
+| `R3FResourceCacheProvider` | Supplies one cache guard |
+| `useGuardedLoader` | Mirrors `useLoader` and borrows the resolved result |
+| `GuardedPrimitive` | Renders an R3F primitive with `dispose={null}` |
+| `useR3FResourceCache` | Reads the supplied cache guard |
+
+See [the API reference](docs/api.md), [R3F guide](docs/r3f-guide.md), [ownership model](docs/ownership-model.md) and [measurement methodology](docs/methodology.md).
+
+## Custom collectors
+
+Built-in collection covers Object3D trees, geometry and material arrays, texture-valued material properties and uniforms, scenes, skeletons, render targets and common GLTF result fields.
+
+Application-specific containers can add resources without replacing the built-in collector:
+
+```ts
+const registry = createResourceRegistry({
+  mode: 'dispose',
+  collectors: [
+    (root) => isEffectComposerBundle(root)
+      ? root.passes.filter((pass) => typeof pass.dispose === 'function')
+      : [],
+  ],
+})
+```
+
+A render target is treated as the owner of its attachments, so the target and its textures are not disposed twice.
+
+## Diagnostics
+
+`registry.snapshot()` includes:
+
+- Active leases and protections, with labels and ownership.
+- Tracked, pending, protected, owned and borrowed resource counts.
+- Exact counts for geometry, material, texture, render target, skeleton and custom resources.
+- Immutable lifecycle events including scheduled, cancelled, disposed, would-dispose and disposal-error outcomes.
+
+Disposal exceptions are reported through both diagnostics and the optional `onError` callback. Cleanup then continues for the remaining resources.
+
+## What this cannot solve
+
+- `renderer.info` does not expose GPU byte usage.
+- The package does not own `WebGLRenderer.dispose()` or browser context loss.
+- It cannot infer an application-specific cache eviction policy.
+- Direct disposal by another library cannot be intercepted.
+- A resource with no `dispose()` capability remains outside the guarantee.
+- WebGPU measurement is outside the `0.1.0` scope.
+- FinalizationRegistry is intentionally not used because garbage-collection timing is nondeterministic and does not express ownership.
+
+## Development
+
+```bash
+npm ci
+npm run typecheck
+npm test
+npm run build
+npm run demo:build
+npm run test:browser
+```
+
+The package is tested as ESM and CommonJS, with TypeScript declarations and independent core, React and R3F entry points.
+
+## Contributing and security
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a change. Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md); do not include exploit details in a public issue.
 
 ## Licence
 
-MIT
+MIT © Oskaras Margevicius

@@ -23,3 +23,26 @@ Do not add runtime dependencies without discussing the trade-off first. Keep Thr
 ## Measurement rule
 
 Do not add a performance or memory number to the README unless it came from a committed harness run. Record the browser, operating system, GPU renderer, number of cycles, fixed inputs and capture time. Describe `renderer.info.memory` values as resource counts, not bytes or direct driver memory.
+
+
+## R3F cache rule
+
+A change to guarded loading must test all three ownership moments:
+
+1. One mounted consumer can leave without destroying another.
+2. Zero consumers can be valid while the cache protection remains.
+3. Eviction followed by the final consumer release disposes exactly once.
+
+Also cover rejection or eviction while the loader callback is still pending.
+
+## Before opening a pull request
+
+```bash
+npm run check
+npm run test:browser
+npm pack --dry-run
+```
+
+When measurements change, generate a new dated capture and chart. Do not edit raw JSON, CSV or reported values by hand.
+
+Keep documentation in British English and avoid claims that imply every R3F scene requires this package.

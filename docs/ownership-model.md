@@ -40,4 +40,14 @@ Rejected because it trades ownership ambiguity for additional GPU memory, load t
 
 R3F already attempts automatic disposal for declarative objects. Cached loader results and `<primitive>` objects need explicit handling. A tracked subtree should set `dispose={null}` so R3F and this package do not both manage the same lifecycle.
 
-If a `useLoader` result remains in the R3F cache, it remains owned. Use a protection until `useLoader.clear()` runs. If eviction is outside the caller's control, track the result as borrowed.
+If a `useLoader` result remains in the R3F cache, the cache is an owner. `createR3FResourceCache` creates that protection when the loader resolves and releases it only through `cache.evict` or `cache.clear`. Mounted hook users are borrowers. Direct `useLoader.clear` calls are unsupported for guarded entries because they bypass the ownership transition.
+
+One R3F loader/input key can belong to one guard. This matches the global nature of R3F's loader cache and prevents two registries from independently authorising disposal.
+
+## Finalisation policy
+
+Imperative leases dispose synchronously by default. React helpers request microtask finalisation because development Strict Mode may release and reacquire the same stable root within one task.
+
+A pending resource remains tracked. Reacquiring it cancels the pending transition and records `disposal-cancelled`. If every count is still zero when the microtask runs, normal audit or disposal finalisation occurs. `registry.flush()` exposes the same transition synchronously for tests and controlled shutdown.
+
+The microtask is a deterministic scheduling boundary, not a garbage-collection finaliser or an arbitrary time delay.
