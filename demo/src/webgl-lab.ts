@@ -14,7 +14,10 @@ import {
   TorusKnotGeometry,
   WebGLRenderer,
 } from 'three'
-import { createResourceRegistry } from 'three-dispose-guard'
+import {
+  collectDisposableResources,
+  createResourceRegistry,
+} from 'three-dispose-guard'
 
 export interface MemorySample {
   cycle: number
@@ -32,6 +35,8 @@ export interface VariantReport {
 export interface BenchmarkReport {
   cycles: number
   unmanaged: VariantReport
+  naive: VariantReport
+  native: VariantReport
   guarded: VariantReport
   renderer: string
   browser: string
@@ -119,9 +124,11 @@ function rendererName(renderer: WebGLRenderer): string {
   return gl.getParameter(extension.UNMASKED_RENDERER_WEBGL) as string
 }
 
+export type BenchmarkVariant = 'unmanaged' | 'naive' | 'native' | 'guarded'
+
 async function runVariant(
   cycles: number,
-  guarded: boolean,
+  variant: BenchmarkVariant,
   onSample?: (sample: MemorySample) => void,
 ): Promise<{ report: VariantReport; renderer: string }> {
   const canvas = document.createElement('canvas')
@@ -143,14 +150,18 @@ async function runVariant(
 
   for (let cycle = 1; cycle <= cycles; cycle += 1) {
     const group = createCycleGroup(cycle)
-    const lease = guarded
+    const lease = variant === 'guarded'
       ? registry.acquire(group, { ownership: 'owned', label: `cycle ${cycle}` })
       : null
 
     scene.add(group)
     renderer.render(scene, camera)
     scene.remove(group)
-    lease?.release()
+    if (lease) {
+      lease.release()
+    } else if (variant === 'naive' || variant === 'native') {
+      for (const resource of collectDisposableResources(group)) resource.dispose()
+    }
     renderer.render(scene, camera)
 
     const sample = readSample(renderer, cycle)
@@ -170,16 +181,22 @@ export async function runBenchmark(
   cycles = 50,
   callbacks?: {
     onUnmanagedSample?: (sample: MemorySample) => void
+    onNaiveSample?: (sample: MemorySample) => void
+    onNativeSample?: (sample: MemorySample) => void
     onGuardedSample?: (sample: MemorySample) => void
   },
 ): Promise<BenchmarkReport> {
   const boundedCycles = Math.min(100, Math.max(1, Math.round(cycles)))
-  const unmanaged = await runVariant(boundedCycles, false, callbacks?.onUnmanagedSample)
-  const guarded = await runVariant(boundedCycles, true, callbacks?.onGuardedSample)
+  const unmanaged = await runVariant(boundedCycles, 'unmanaged', callbacks?.onUnmanagedSample)
+  const naive = await runVariant(boundedCycles, 'naive', callbacks?.onNaiveSample)
+  const native = await runVariant(boundedCycles, 'native', callbacks?.onNativeSample)
+  const guarded = await runVariant(boundedCycles, 'guarded', callbacks?.onGuardedSample)
 
   return {
     cycles: boundedCycles,
     unmanaged: unmanaged.report,
+    naive: naive.report,
+    native: native.report,
     guarded: guarded.report,
     renderer: guarded.renderer,
     browser: navigator.userAgent,

@@ -1,35 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="500" viewBox="0 0 1200 500" role="img" aria-labelledby="title desc">
-  <title id="title">Measured Three.js resource counts over 50 mount cycles</title>
-  <desc id="desc">The unmanaged run rises from 9 to 401 resources. The guarded run remains at 1.</desc>
-  <rect width="1200" height="500" fill="#0b0d0c"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="title desc">
+  <title id="title">Measured Three.js resource counts over five 50-cycle runs</title>
+  <desc id="desc">Unmanaged resources rise to 401. Naïve eager, declarative-style and Dispose Guard each finish at 1 with zero variance for unique resources.</desc>
+  <rect width="1200" height="560" fill="#0b0d0c"/>
   <g font-family="ui-monospace, SFMono-Regular, Consolas, monospace">
-    <text x="64" y="60" fill="#f3f5ee" font-size="22" font-weight="700">50-cycle WebGL allocation check</text>
-    <text x="64" y="88" fill="#9da69e" font-size="13">renderer.info.memory geometries + textures</text>
-    <g stroke="#252a26" stroke-width="1">
-      <line x1="90" y1="130" x2="1130" y2="130"/>
-      <line x1="90" y1="205" x2="1130" y2="205"/>
-      <line x1="90" y1="280" x2="1130" y2="280"/>
-      <line x1="90" y1="355" x2="1130" y2="355"/>
-      <line x1="90" y1="430" x2="1130" y2="430"/>
-    </g>
-    <g fill="#68716b" font-size="11">
-      <text x="45" y="134">400</text>
-      <text x="45" y="209">300</text>
-      <text x="45" y="284">200</text>
-      <text x="45" y="359">100</text>
-      <text x="68" y="434">0</text>
-      <text x="88" y="462">1</text>
-      <text x="1105" y="462">50 cycles</text>
-    </g>
-    <path d="M90 423 L1130 129" fill="none" stroke="#ff6545" stroke-width="5" stroke-linecap="round"/>
-    <path d="M90 429 L1130 429" fill="none" stroke="#d8ff53" stroke-width="5" stroke-linecap="round"/>
-    <circle cx="1130" cy="129" r="7" fill="#ff6545"/>
-    <circle cx="1130" cy="429" r="7" fill="#d8ff53"/>
-    <g font-size="13" font-weight="700">
-      <rect x="902" y="110" width="190" height="34" fill="#171a17"/>
-      <text x="918" y="132" fill="#ff8b72">UNMANAGED 401</text>
-      <rect x="902" y="386" width="190" height="34" fill="#171a17"/>
-      <text x="918" y="408" fill="#d8ff53">DISPOSE GUARD 1</text>
-    </g>
+    <text x="64" y="58" fill="#f3f5ee" font-size="22" font-weight="700">Five-run WebGL allocation study</text>
+    <text x="64" y="86" fill="#9da69e" font-size="13">mean renderer.info.memory geometries + textures, 50 cycles per run</text>
+    <line x1="90" y1="450.0" x2="1110" y2="450.0" stroke="#252a26"/><text x="42" y="454" fill="#68716b" font-size="11">0</text>
+<line x1="90" y1="375.2" x2="1110" y2="375.2" stroke="#252a26"/><text x="42" y="379.2" fill="#68716b" font-size="11">100</text>
+<line x1="90" y1="300.4" x2="1110" y2="300.4" stroke="#252a26"/><text x="42" y="304.4" fill="#68716b" font-size="11">200</text>
+<line x1="90" y1="225.6" x2="1110" y2="225.6" stroke="#252a26"/><text x="42" y="229.6" fill="#68716b" font-size="11">300</text>
+<line x1="90" y1="150.7" x2="1110" y2="150.7" stroke="#252a26"/><text x="42" y="154.7" fill="#68716b" font-size="11">400</text>
+    <line x1="90" y1="150" x2="90" y2="450" stroke="#4a514a"/>
+    <line x1="90" y1="450" x2="1110" y2="450" stroke="#4a514a"/>
+    <polyline points="90.0,443.3 110.8,437.3 131.6,431.3 152.4,425.3 173.3,419.3 194.1,413.3 214.9,407.4 235.7,401.4 256.5,395.4 277.3,389.4 298.2,383.4 319.0,377.4 339.8,371.4 360.6,365.5 381.4,359.5 402.2,353.5 423.1,347.5 443.9,341.5 464.7,335.5 485.5,329.6 506.3,323.6 527.1,317.6 548.0,311.6 568.8,305.6 589.6,299.6 610.4,293.6 631.2,287.7 652.0,281.7 672.9,275.7 693.7,269.7 714.5,263.7 735.3,257.7 756.1,251.7 776.9,245.8 797.8,239.8 818.6,233.8 839.4,227.8 860.2,221.8 881.0,215.8 901.8,209.9 922.7,203.9 943.5,197.9 964.3,191.9 985.1,185.9 1005.9,179.9 1026.7,173.9 1047.6,168.0 1068.4,162.0 1089.2,156.0 1110.0,150.0" fill="none" stroke="#ff6545" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="580" y1="62" x2="614" y2="62" stroke="#ff6545" stroke-width="4"/>
+<text x="626" y="67" fill="#f3f5ee" font-size="12">UNMANAGED 401</text>
+<polyline points="90.0,449.3 110.8,449.3 131.6,449.3 152.4,449.3 173.3,449.3 194.1,449.3 214.9,449.3 235.7,449.3 256.5,449.3 277.3,449.3 298.2,449.3 319.0,449.3 339.8,449.3 360.6,449.3 381.4,449.3 402.2,449.3 423.1,449.3 443.9,449.3 464.7,449.3 485.5,449.3 506.3,449.3 527.1,449.3 548.0,449.3 568.8,449.3 589.6,449.3 610.4,449.3 631.2,449.3 652.0,449.3 672.9,449.3 693.7,449.3 714.5,449.3 735.3,449.3 756.1,449.3 776.9,449.3 797.8,449.3 818.6,449.3 839.4,449.3 860.2,449.3 881.0,449.3 901.8,449.3 922.7,449.3 943.5,449.3 964.3,449.3 985.1,449.3 1005.9,449.3 1026.7,449.3 1047.6,449.3 1068.4,449.3 1089.2,449.3 1110.0,449.3" fill="none" stroke="#cf9bff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="860" y1="62" x2="894" y2="62" stroke="#cf9bff" stroke-width="4"/>
+<text x="906" y="67" fill="#f3f5ee" font-size="12">NAÏVE EAGER 1</text>
+<polyline points="90.0,449.3 110.8,449.3 131.6,449.3 152.4,449.3 173.3,449.3 194.1,449.3 214.9,449.3 235.7,449.3 256.5,449.3 277.3,449.3 298.2,449.3 319.0,449.3 339.8,449.3 360.6,449.3 381.4,449.3 402.2,449.3 423.1,449.3 443.9,449.3 464.7,449.3 485.5,449.3 506.3,449.3 527.1,449.3 548.0,449.3 568.8,449.3 589.6,449.3 610.4,449.3 631.2,449.3 652.0,449.3 672.9,449.3 693.7,449.3 714.5,449.3 735.3,449.3 756.1,449.3 776.9,449.3 797.8,449.3 818.6,449.3 839.4,449.3 860.2,449.3 881.0,449.3 901.8,449.3 922.7,449.3 943.5,449.3 964.3,449.3 985.1,449.3 1005.9,449.3 1026.7,449.3 1047.6,449.3 1068.4,449.3 1089.2,449.3 1110.0,449.3" fill="none" stroke="#7da8ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="580" y1="96" x2="614" y2="96" stroke="#7da8ff" stroke-width="4"/>
+<text x="626" y="101" fill="#f3f5ee" font-size="12">DECLARATIVE-STYLE 1</text>
+<polyline points="90.0,449.3 110.8,449.3 131.6,449.3 152.4,449.3 173.3,449.3 194.1,449.3 214.9,449.3 235.7,449.3 256.5,449.3 277.3,449.3 298.2,449.3 319.0,449.3 339.8,449.3 360.6,449.3 381.4,449.3 402.2,449.3 423.1,449.3 443.9,449.3 464.7,449.3 485.5,449.3 506.3,449.3 527.1,449.3 548.0,449.3 568.8,449.3 589.6,449.3 610.4,449.3 631.2,449.3 652.0,449.3 672.9,449.3 693.7,449.3 714.5,449.3 735.3,449.3 756.1,449.3 776.9,449.3 797.8,449.3 818.6,449.3 839.4,449.3 860.2,449.3 881.0,449.3 901.8,449.3 922.7,449.3 943.5,449.3 964.3,449.3 985.1,449.3 1005.9,449.3 1026.7,449.3 1047.6,449.3 1068.4,449.3 1089.2,449.3 1110.0,449.3" fill="none" stroke="#d8ff53" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="860" y1="96" x2="894" y2="96" stroke="#d8ff53" stroke-width="4"/>
+<text x="906" y="101" fill="#f3f5ee" font-size="12">DISPOSE GUARD 1</text>
+    <text x="90" y="482" fill="#68716b" font-size="11">cycle 1</text>
+    <text x="1052" y="482" fill="#68716b" font-size="11">cycle 50</text>
+    <text x="64" y="525" fill="#9da69e" font-size="11">Windows 10.0.26200 · Chromium 151.0.7922.34 · ANGLE SwiftShader · captured 2026-08-21</text>
   </g>
 </svg>

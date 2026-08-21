@@ -1,13 +1,32 @@
 import { expect, test } from '@playwright/test'
 
+test('@smoke the research lab loads without page or console errors', async ({ page }) => {
+  const errors: string[] = []
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text())
+  })
+  page.on('pageerror', (error) => errors.push(error.message))
+
+  const response = await page.goto('/')
+
+  expect(response?.ok()).toBe(true)
+  await expect(page.getByRole('heading', { name: /Dispose the orphan/i })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Run selected proof/i })).toBeEnabled()
+  expect(errors).toEqual([])
+})
+
 test('the browser harness shows growth without disposal and a flat guarded run', async ({ page }) => {
   await page.goto('/')
   const report = await page.evaluate(() => window.__disposeGuard.runBenchmark(12))
   const unmanaged = report.unmanaged.final.geometries + report.unmanaged.final.textures
   const guarded = report.guarded.final.geometries + report.guarded.final.textures
+  const naive = report.naive.final.geometries + report.naive.final.textures
+  const native = report.native.final.geometries + report.native.final.textures
 
   expect(unmanaged).toBeGreaterThan(40)
   expect(guarded).toBeLessThanOrEqual(2)
+  expect(naive).toBeLessThanOrEqual(2)
+  expect(native).toBeLessThanOrEqual(2)
 })
 
 test('one shared WebGL texture survives until the final owner releases it', async ({ page }) => {
@@ -21,6 +40,32 @@ test('one shared WebGL texture survives until the final owner releases it', asyn
   expect(proof.disposeEventsAfterLastRelease).toBe(3)
 })
 
+test('all specialised lifecycle proofs pass in a real browser', async ({ page }) => {
+  await page.goto('/')
+  const reports = await page.evaluate(async () => {
+    const ids = ['shared', 'cache', 'canvas', 'churn', 'in-flight'] as const
+    const results = []
+    for (const id of ids) results.push(await window.__disposeGuard.runScenario(id, 8))
+    return results
+  })
+
+  for (const report of reports) {
+    expect(report.assertions, report.scenario).not.toHaveLength(0)
+    expect(report.assertions.every((assertion) => assertion.passed), report.scenario).toBe(true)
+  }
+})
+
+test('the compact research suite exposes raw runs, variance and proofs', async ({ page }) => {
+  await page.goto('/')
+  const suite = await page.evaluate(() => window.__disposeGuard.runResearchSuite(2, 6))
+
+  expect(suite.runs).toBe(2)
+  expect(suite.cyclesPerRun).toBe(6)
+  expect(suite.summary.guarded.finalTotals).toHaveLength(2)
+  expect(suite.proofs).toHaveLength(5)
+  expect(suite.proofs.every((proof) => proof.assertions.every((item) => item.passed))).toBe(true)
+})
+
 for (const width of [375, 768, 1024, 1440]) {
   test(`the page has no horizontal overflow at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
@@ -31,6 +76,6 @@ for (const width of [375, 768, 1024, 1440]) {
     }))
 
     expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport)
-    await expect(page.getByRole('heading', { name: /Dispose what is orphaned/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Dispose the orphan/i })).toBeVisible()
   })
 }

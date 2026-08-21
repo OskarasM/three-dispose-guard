@@ -17,7 +17,9 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      "three-dispose-guard": ["./src/index.ts"]
+      "three-dispose-guard": ["./src/index.ts"],
+      "three-dispose-guard/react": ["./src/react.tsx"],
+      "three-dispose-guard/r3f": ["./src/r3f.tsx"]
     },
     "types": ["vite/client", "vitest/globals", "node"]
   },
