@@ -64,9 +64,32 @@ class DeferredLoader extends Loader<TestAsset, string> {
   }
 }
 
+class RejectOnceLoader extends Loader<TestAsset, string> {
+  static attempts = 0
+  static readonly originalError = new Error('loader rejected once')
+
+  load(
+    _url: string,
+    onLoad: (asset: TestAsset) => void,
+    _onProgress: (event: ProgressEvent) => void,
+    onError: (error: unknown) => void,
+  ): void {
+    RejectOnceLoader.attempts += 1
+    if (RejectOnceLoader.attempts === 1) {
+      queueMicrotask(() => onError(RejectOnceLoader.originalError))
+      return
+    }
+
+    const loaded = createAsset()
+    ImmediateLoader.loaded.push(loaded)
+    queueMicrotask(() => onLoad(loaded.asset))
+  }
+}
+
 beforeEach(() => {
   ImmediateLoader.loaded = []
   DeferredLoader.pending = []
+  RejectOnceLoader.attempts = 0
 })
 
 describe('R3FResourceCache', () => {
@@ -105,6 +128,26 @@ describe('R3FResourceCache', () => {
     expect(DeferredLoader.pending[0].textureDispose).toHaveBeenCalledOnce()
     expect(cache.snapshot().entries).toHaveLength(0)
     expect(registry.snapshot().trackedResources).toBe(0)
+  })
+
+  it('leaves rejected entries unprotected and retryable', async () => {
+    const registry = createResourceRegistry({ mode: 'dispose' })
+    const cache = createR3FResourceCache({ registry })
+
+    cache.preload(RejectOnceLoader, '/retry.glb')
+    await vi.waitFor(() => expect(cache.snapshot().errors).toBe(1))
+
+    expect(registry.snapshot().activeProtections).toBe(0)
+    expect(RejectOnceLoader.attempts).toBe(1)
+
+    cache.preload(RejectOnceLoader, '/retry.glb')
+    await vi.waitFor(() => expect(cache.snapshot().ready).toBe(1))
+
+    expect(RejectOnceLoader.attempts).toBe(2)
+    expect(registry.snapshot().activeProtections).toBe(1)
+
+    cache.evict(RejectOnceLoader, '/retry.glb')
+    expect(ImmediateLoader.loaded[0].textureDispose).toHaveBeenCalledOnce()
   })
 
   it('refuses two registries claiming the same global R3F cache entry', async () => {

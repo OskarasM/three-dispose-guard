@@ -1,16 +1,15 @@
 import {
   useLoader,
-  type ConstructorRepresentation,
   type Extensions,
-  type LoaderResult,
   type ThreeElements,
 } from '@react-three/fiber'
 import {
   createContext,
+  createElement,
   type PropsWithChildren,
   useContext,
 } from 'react'
-import type { Loader } from 'three'
+import type { Loader, Object3D } from 'three'
 import { ResourceRegistry } from './registry'
 import { useResourceLease } from './react'
 import type {
@@ -18,14 +17,19 @@ import type {
   ResourceRoot,
 } from './types'
 
-export type GuardedLoaderInput =
-  | string
-  | string[]
-  | string[][]
-  | Readonly<string | string[] | string[][]>
+export type GuardedLoaderInput = string | string[]
+export type GuardedLoaderConstructor<T = unknown> = new (...args: any[]) => Loader<T>
 
-type LoaderLike = Loader<any, GuardedLoaderInput>
-type LoaderRepresentation = LoaderLike | ConstructorRepresentation<LoaderLike>
+type LoaderLike = Loader<any>
+type LoaderRepresentation = GuardedLoaderConstructor<any>
+type RawGuardedLoaderResult<L extends LoaderRepresentation> =
+  Awaited<ReturnType<InstanceType<L>['loadAsync']>>
+export type GuardedLoaderResult<L extends LoaderRepresentation> =
+  RawGuardedLoaderResult<L> extends { scene: Object3D }
+    ? RawGuardedLoaderResult<L> & import('@react-three/fiber').ObjectMap
+    : RawGuardedLoaderResult<L>
+export type GuardedLoaderReturn<L extends LoaderRepresentation, I extends GuardedLoaderInput> =
+  I extends any[] ? GuardedLoaderResult<L>[] : GuardedLoaderResult<L>
 type EntryStatus = 'loading' | 'ready' | 'error' | 'evicted'
 
 interface CacheEntry {
@@ -226,7 +230,12 @@ class R3FResourceCacheImpl implements R3FResourceCache {
       entries = new Map()
       this.entries.set(loader, entries)
     }
-    if (entries.has(key)) return
+    const existing = entries.get(key)
+    if (existing) {
+      if (existing.status !== 'error') return
+      entries.delete(key)
+      this.releaseClaim(loader, key)
+    }
 
     this.claim(loader, key)
     const parts = inputParts(input)
@@ -292,6 +301,9 @@ class R3FResourceCacheImpl implements R3FResourceCache {
   private reject(entry: CacheEntry, error: unknown): void {
     const current = this.entries.get(entry.loader)?.get(entry.key)
     if (current !== entry || entry.status === 'evicted') return
+    useLoader.clear(entry.loader, entry.input)
+    for (const protection of entry.protections.splice(0)) protection.release()
+
     entry.status = 'error'
     entry.error = error instanceof Error ? error.message : String(error)
     this.emit()
@@ -378,7 +390,7 @@ export function useGuardedLoader<
   input: I,
   extensions?: Extensions<L>,
   onProgress?: (event: ProgressEvent<EventTarget>) => void,
-): I extends any[] ? LoaderResult<L>[] : LoaderResult<L> {
+): GuardedLoaderReturn<L, I> {
   const cache = asInternalCache(useR3FResourceCache())
   cache.prepare(loader, input)
   const result = useLoader(
@@ -394,12 +406,12 @@ export function useGuardedLoader<
     releasePolicy: 'microtask',
     label: `R3F consumer: ${inputLabel(input)}`,
   })
-  return result
+  return result as GuardedLoaderReturn<L, I>
 }
 
 export type GuardedPrimitiveProps = Omit<ThreeElements['primitive'], 'dispose'>
 
 export function GuardedPrimitive({ object, ...props }: GuardedPrimitiveProps) {
-  return <primitive {...props} object={object} dispose={null} />
+  return createElement('primitive' as any, { ...props, object, dispose: null })
 }
 
