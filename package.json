@@ -57,7 +57,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:browser": "playwright test --project=chromium",
-    "test:browser:smoke": "playwright test --project=firefox --project=webkit --grep @smoke",
+    "test:browser:smoke": "playwright test --project=firefox --project=webkit --grep @smoke --workers=1",
     "benchmark:capture": "node scripts/capture-benchmark.mjs",
     "package:check": "npm run build && node scripts/package-smoke.mjs",
     "release:check": "npm run check && npm run test:browser && npm run package:check",

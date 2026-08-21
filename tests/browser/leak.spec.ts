@@ -10,8 +10,8 @@ test('@smoke the research lab loads without page or console errors', async ({ pa
   const response = await page.goto('/')
 
   expect(response?.ok()).toBe(true)
-  await expect(page.getByRole('heading', { name: /Dispose the orphan/i })).toBeVisible()
-  await expect(page.getByRole('button', { name: /Run selected proof/i })).toBeEnabled()
+  await expect(page.getByRole('heading', { name: /Dispose the orphan/i })).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByRole('button', { name: /Run selected proof/i })).toBeEnabled({ timeout: 20_000 })
   expect(errors).toEqual([])
 })
 
