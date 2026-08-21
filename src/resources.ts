@@ -27,6 +27,7 @@ export function resourceKind(value: unknown): ResourceKind | null {
   if (value.isMaterial === true) return 'material'
   if (value.isTexture === true) return 'texture'
   if (value.isSkeleton === true) return 'skeleton'
+  if (typeof value.dispose === 'function') return 'custom'
   return null
 }
 

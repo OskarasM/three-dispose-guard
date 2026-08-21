@@ -7,7 +7,17 @@ import type {
   WebGLRenderTarget,
 } from 'three'
 
-export type DisposableResource = BufferGeometry | Material | Texture | WebGLRenderTarget | Skeleton
+export interface CustomDisposableResource {
+  dispose(): void
+}
+
+export type DisposableResource =
+  | BufferGeometry
+  | Material
+  | Texture
+  | WebGLRenderTarget
+  | Skeleton
+  | CustomDisposableResource
 
 export type ResourceRoot =
   | DisposableResource
@@ -15,11 +25,19 @@ export type ResourceRoot =
   | ResourceRoot[]
   | Record<string, unknown>
 
-export type ResourceKind = 'geometry' | 'material' | 'texture' | 'renderTarget' | 'skeleton'
+export type ResourceKind =
+  | 'geometry'
+  | 'material'
+  | 'texture'
+  | 'renderTarget'
+  | 'skeleton'
+  | 'custom'
 
 export type RegistryMode = 'audit' | 'dispose'
 
 export type Ownership = 'owned' | 'borrowed'
+
+export type ReleasePolicy = 'immediate' | 'microtask'
 
 export interface AcquireOptions {
   /**
@@ -28,6 +46,11 @@ export interface AcquireOptions {
    */
   ownership?: Ownership
   label?: string
+  /**
+   * Imperative leases release immediately by default. React helpers opt into a
+   * microtask so development Strict Mode can reclaim a same-tick remount.
+   */
+  releasePolicy?: ReleasePolicy
 }
 
 export interface ProtectOptions {
@@ -41,7 +64,9 @@ export type DiagnosticEventType =
   | 'unprotected'
   | 'disposed'
   | 'would-dispose'
-
+  | 'disposal-scheduled'
+  | 'disposal-cancelled'
+  | 'dispose-error'
 export interface DiagnosticEvent {
   id: number
   at: number
@@ -51,17 +76,29 @@ export interface DiagnosticEvent {
   resourceCount: number
   kinds: Partial<Record<ResourceKind, number>>
   source?: 'release' | 'protection'
+  message?: string
+}
+
+
+export interface RegistryScopeSnapshot {
+  id: number
+  type: 'lease' | 'protection'
+  label: string
+  ownership?: Ownership
+  resourceCount: number
 }
 
 export interface RegistrySnapshot {
   mode: RegistryMode
   activeLeases: number
   activeProtections: number
+  pendingDisposals: number
   trackedResources: number
   protectedResources: number
   ownedResources: number
   borrowedResources: number
   kinds: Partial<Record<ResourceKind, number>>
+  scopes: readonly RegistryScopeSnapshot[]
   events: readonly DiagnosticEvent[]
 }
 
@@ -90,6 +127,12 @@ export interface ResourceRegistryOptions {
   historyLimit?: number
   /** Receives disposal errors without interrupting the remaining cleanup. */
   onError?: (error: unknown, resource: DisposableResource) => void
+  /** Adds application-specific resources without replacing the built-in collector. */
+  collectors?: readonly ResourceCollector[]
 }
 
 export type RegistryListener = (snapshot: RegistrySnapshot) => void
+
+export type ResourceCollector = (
+  root: ResourceRoot,
+) => Iterable<DisposableResource> | null | undefined

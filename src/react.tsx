@@ -64,12 +64,13 @@ export function useResourceLease(
 
   const ownership = options.ownership ?? 'borrowed'
   const label = options.label
+  const releasePolicy = options.releasePolicy ?? 'microtask'
 
   useEffect(() => {
     if (!root) return
-    const lease = registry.acquire(root, { ownership, label })
+    const lease = registry.acquire(root, { ownership, label, releasePolicy })
     return () => lease.release()
-  }, [registry, root, ownership, label])
+  }, [registry, root, ownership, label, releasePolicy])
 }
 
 export function useResourceSnapshot(registry?: ResourceRegistry): RegistrySnapshot {

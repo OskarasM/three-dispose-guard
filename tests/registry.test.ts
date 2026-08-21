@@ -114,4 +114,82 @@ describe('ResourceRegistry ownership', () => {
     expect(textureDisposals).toBe(1_000)
     expect(registry.snapshot().events.length).toBeLessThanOrEqual(8)
   })
+  it('reclaims a same-tick microtask release before disposal', async () => {
+    const { mesh, texture } = sharedMesh()
+    const dispose = vi.spyOn(texture, 'dispose')
+    const registry = createResourceRegistry({ mode: 'dispose' })
+    const first = registry.acquire(mesh, {
+      ownership: 'owned',
+      releasePolicy: 'microtask',
+      label: 'strict-mode first pass',
+    })
+
+    first.release()
+    expect(registry.snapshot().pendingDisposals).toBe(3)
+
+    const remount = registry.acquire(mesh, {
+      ownership: 'owned',
+      releasePolicy: 'microtask',
+      label: 'strict-mode remount',
+    })
+    await Promise.resolve()
+
+    expect(dispose).not.toHaveBeenCalled()
+    expect(registry.snapshot().pendingDisposals).toBe(0)
+    expect(registry.snapshot().events.some((event) => event.type === 'disposal-cancelled')).toBe(true)
+
+    remount.release()
+    await Promise.resolve()
+
+    expect(dispose).toHaveBeenCalledOnce()
+    expect(registry.snapshot().trackedResources).toBe(0)
+  })
+
+  it('extends collection for application-specific resource containers', () => {
+    const pass = { dispose: vi.fn() }
+    const root = { postProcessingPass: pass }
+    const registry = createResourceRegistry({
+      mode: 'dispose',
+      collectors: [
+        (candidate) => candidate === root ? [pass] : [],
+      ],
+    })
+
+    const lease = registry.acquire(root, { ownership: 'owned', label: 'composer pass' })
+
+    expect(registry.snapshot().kinds).toEqual({ custom: 1 })
+    expect(registry.snapshot().scopes).toEqual([{
+      id: lease.id,
+      type: 'lease',
+      label: 'composer pass',
+      ownership: 'owned',
+      resourceCount: 1,
+    }])
+
+    lease.release()
+    expect(pass.dispose).toHaveBeenCalledOnce()
+  })
+
+  it('reports disposal failures and continues cleanup', () => {
+    const onError = vi.fn()
+    const failing = {
+      dispose: vi.fn(() => {
+        throw new Error('driver refused cleanup')
+      }),
+    }
+    const healthy = { dispose: vi.fn() }
+    const registry = createResourceRegistry({ mode: 'dispose', onError })
+    const lease = registry.acquire([failing, healthy], { ownership: 'owned' })
+
+    lease.release()
+
+    expect(failing.dispose).toHaveBeenCalledOnce()
+    expect(healthy.dispose).toHaveBeenCalledOnce()
+    expect(onError).toHaveBeenCalledOnce()
+    expect(registry.snapshot().events).toContainEqual(expect.objectContaining({
+      type: 'dispose-error',
+      message: 'driver refused cleanup',
+      kinds: { custom: 1 },
+    }))
+  })
 })
