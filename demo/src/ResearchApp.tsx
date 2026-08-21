@@ -45,16 +45,51 @@ function DownloadIcon() {
 
 function HeroScene() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [webglStatus, setWebglStatus] = useState<'initialising' | 'live' | 'fallback'>(
+    'initialising',
+  )
 
   useEffect(() => {
-    if (!canvasRef.current) return
-    return mountHeroScene(canvasRef.current)
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const context = canvas.getContext('webgl2', {
+      alpha: true,
+      antialias: true,
+      powerPreference: 'low-power',
+    })
+    if (!context) {
+      setWebglStatus('fallback')
+      return
+    }
+
+    try {
+      const unmount = mountHeroScene(canvas)
+      setWebglStatus('live')
+      return unmount
+    } catch {
+      setWebglStatus('fallback')
+    }
   }, [])
 
+  const liveLabel = webglStatus === 'fallback'
+    ? 'Static fallback'
+    : webglStatus === 'live'
+      ? 'WebGL live'
+      : 'Initialising WebGL'
+
   return (
-    <div className="hero-visual" aria-label="Live WebGL scene representing shared GPU ownership">
+    <div
+      className="hero-visual"
+      aria-label={webglStatus === 'fallback'
+        ? 'Static illustration representing shared GPU ownership'
+        : 'Live WebGL scene representing shared GPU ownership'}
+    >
       <canvas ref={canvasRef} aria-hidden="true" />
-      <div className="visual-label visual-label-top"><span className="live-dot" /> WebGL live</div>
+      <div className="visual-label visual-label-top">
+        {webglStatus === 'live' && <span className="live-dot" />}
+        {liveLabel}
+      </div>
       <div className="visual-label visual-label-bottom">
         <span>ownership explicit</span>
         <strong>disposal deterministic</strong>

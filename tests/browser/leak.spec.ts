@@ -1,6 +1,17 @@
 import { expect, test } from '@playwright/test'
 
 test('@smoke the research lab loads without page or console errors', async ({ page }) => {
+  await page.addInitScript(() => {
+    const originalGetContext = HTMLCanvasElement.prototype.getContext
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      configurable: true,
+      value(contextId: string, ...args: unknown[]) {
+        if (contextId === 'webgl2') return null
+        return Reflect.apply(originalGetContext, this, [contextId, ...args])
+      },
+    })
+  })
+
   const errors: string[] = []
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text())
@@ -11,6 +22,7 @@ test('@smoke the research lab loads without page or console errors', async ({ pa
 
   expect(response?.ok()).toBe(true)
   await expect(page.getByRole('heading', { name: /Dispose the orphan/i })).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText('Static fallback', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /Run selected proof/i })).toBeEnabled({ timeout: 20_000 })
   expect(errors).toEqual([])
 })
