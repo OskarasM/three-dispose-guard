@@ -41,12 +41,17 @@
       "import": "./dist/react.js",
       "require": "./dist/react.cjs"
     },
+    "./r3f": {
+      "types": "./dist/r3f.d.ts",
+      "import": "./dist/r3f.js",
+      "require": "./dist/r3f.cjs"
+    },
     "./package.json": "./package.json"
   },
   "sideEffects": false,
   "scripts": {
     "dev": "vite --config vite.config.ts",
-    "build": "tsup src/index.ts src/react.tsx --format esm,cjs --dts --clean --external three --external react",
+    "build": "tsup src/index.ts src/react.tsx src/r3f.tsx --format esm,cjs --dts --clean --external three --external react --external @react-three/fiber",
     "demo:build": "vite build --config vite.config.ts",
     "preview": "vite preview --config vite.config.ts",
     "test": "vitest run",
@@ -56,16 +61,22 @@
     "check": "npm run typecheck && npm test && npm run build && npm run demo:build"
   },
   "peerDependencies": {
-    "react": ">=18",
-    "three": ">=0.163"
+    "@react-three/fiber": ">=8 <10",
+    "react": ">=18 <20",
+    "three": ">=0.163 <1"
   },
   "peerDependenciesMeta": {
+    "@react-three/fiber": {
+      "optional": true
+    },
     "react": {
       "optional": true
     }
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
+    "@react-three/fiber": "^9.7.0",
+    "@react-three/test-renderer": "^9.1.1",
     "@types/node": "^24.13.3",
     "@types/react": "^19.1.11",
     "@types/react-dom": "^19.1.7",
