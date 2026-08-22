@@ -75,10 +75,10 @@
 
 .experiment-brief h3 {
   margin: 34px 0 16px;
-  font-size: clamp(30px, 4vw, 48px);
+  font-size: var(--step-3);
   font-weight: 580;
   line-height: 1;
-  letter-spacing: -0.05em;
+  letter-spacing: var(--track-display);
 }
 
 .experiment-question {
@@ -471,7 +471,7 @@
 .finding-grid h3 {
   margin: 56px 0 14px;
   font-size: 24px;
-  letter-spacing: -0.04em;
+  letter-spacing: var(--track-display);
 }
 
 .finding-grid p,
@@ -496,7 +496,7 @@
 .suite-panel h3 {
   margin: 12px 0;
   font-size: 28px;
-  letter-spacing: -0.04em;
+  letter-spacing: var(--track-display);
 }
 
 .suite-actions {
@@ -599,9 +599,9 @@
 .quickstart h2,
 .limits h2 {
   margin: 14px 0 22px;
-  font-size: clamp(40px, 5vw, 64px);
+  font-size: var(--step-4);
   line-height: 1;
-  letter-spacing: -0.055em;
+  letter-spacing: var(--track-display);
   font-weight: 580;
 }
 

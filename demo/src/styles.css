@@ -1,21 +1,14 @@
-:root {
-  color-scheme: dark;
-  font-family: Inter, "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #f3f5ee;
-  background: #0b0d0c;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  --ink: #f3f5ee;
-  --muted: #9da69e;
-  --dim: #68716b;
-  --line: #2a2f2b;
-  --panel: #121512;
-  --panel-raised: #181c18;
-  --acid: #d8ff53;
-  --acid-ink: #10150a;
-  --orange: #ff6545;
-  --blue: #7da8ff;
-  --mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+/* Tokens live in tokens.css. This file is the dispose-guard site's own layout:
+   the hairline instrument panel, the hero, the chart and the bands. */
+
+
+/* Three type registers, and nothing between them. Display is h1 to h3 only.
+   Chrome is mono, set in the rules that use it. Everything else is body. */
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: var(--track-display);
 }
 
 * {
@@ -178,7 +171,10 @@ pre {
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.04fr) minmax(400px, 0.96fr);
+  /* The copy column carries the display line, so it takes the larger share.
+     Measured: "Keep the shared." in Archivo 800 at 72px needs 570px, and this
+     split gives it 619px at 1440. The voice moment must never wrap. */
+  grid-template-columns: minmax(0, 1.14fr) minmax(380px, 0.86fr);
   gap: clamp(40px, 7vw, 94px);
   align-items: center;
   min-height: 720px;
@@ -219,23 +215,27 @@ p {
 h1 {
   max-width: 780px;
   margin: 28px 0 26px;
-  font-size: clamp(50px, 6.4vw, 88px);
+  font-size: var(--step-5);
   font-weight: 600;
   line-height: 0.97;
-  letter-spacing: -0.065em;
+  letter-spacing: var(--track-display);
 }
 
+/* The one voice moment on this page. It was a system Georgia italic, which
+   meant the loudest line rendered in whatever serif the visitor happened to
+   have. It is now a weight move inside the display face the page actually
+   loads, so it is the same on every machine and costs no extra request. */
 h1 em {
   position: relative;
   color: var(--acid);
-  font-family: Georgia, "Times New Roman", serif;
-  font-weight: 400;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .hero-lede {
   max-width: 620px;
   color: #bcc4bc;
-  font-size: clamp(17px, 1.7vw, 21px);
+  font-size: var(--step-1);
   line-height: 1.6;
 }
 
@@ -457,9 +457,9 @@ h1 em {
 
 .principle-strip p {
   margin: 0;
-  font-size: clamp(20px, 2.3vw, 30px);
+  font-size: var(--step-2);
   font-weight: 650;
-  letter-spacing: -0.035em;
+  letter-spacing: var(--track-display);
 }
 
 .principle-strip span {
@@ -491,9 +491,9 @@ h1 em {
 .cta h2 {
   max-width: 850px;
   margin: 15px 0 0;
-  font-size: clamp(38px, 5vw, 64px);
+  font-size: var(--step-4);
   line-height: 1.02;
-  letter-spacing: -0.055em;
+  letter-spacing: var(--track-display);
   font-weight: 580;
 }
 
@@ -775,7 +775,7 @@ h1 em {
 .ownership-card h3 {
   margin: 15px 0 12px;
   font-size: 27px;
-  letter-spacing: -0.04em;
+  letter-spacing: var(--track-display);
 }
 
 .ownership-card-wide > p {
@@ -1158,7 +1158,7 @@ h1 em {
   }
 
   h1 {
-    font-size: clamp(45px, 14vw, 62px);
+    font-size: clamp(40px, 12.5vw, 56px);
   }
 
   .hero {

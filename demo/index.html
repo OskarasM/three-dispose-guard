@@ -4,12 +4,35 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0b0d0c" />
+
+    <title>three-dispose-guard: ownership-aware GPU disposal for Three.js</title>
     <meta
       name="description"
-      content="Three Dispose Guard makes Three.js GPU resource ownership explicit, testable and safe for shared assets."
+      content="Three.js resources are not freed by garbage collection, and disposing everything on unmount destroys assets another component still uses. This makes ownership explicit, and proves it with six reproducible measurements you can run here."
     />
+    <link rel="canonical" href="https://three-dispose-guard.vercel.app/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://three-dispose-guard.vercel.app/" />
+    <meta property="og:site_name" content="three-dispose-guard" />
+    <meta property="og:title" content="three-dispose-guard: ownership-aware GPU disposal for Three.js" />
+    <meta
+      property="og:description"
+      content="Collection is not disposal. Unmount is not ownership. Six reproducible experiments, raw data included."
+    />
+    <meta property="og:image" content="https://three-dispose-guard.vercel.app/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="three-dispose-guard, ownership-aware GPU resource disposal for Three.js and React Three Fiber." />
+    <meta name="twitter:card" content="summary_large_image" />
+
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <title>Three Dispose Guard</title>
+
+    <!-- Only the display face is preloaded: it sets the largest text above the
+         fold, so it is the swap a visitor actually sees. Body and chrome arrive
+         with the stylesheet and their metric-matched fallbacks hold the layout
+         still in the meantime. -->
+    <link rel="preload" href="/fonts/archivo-var.woff2" as="font" type="font/woff2" crossorigin />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>

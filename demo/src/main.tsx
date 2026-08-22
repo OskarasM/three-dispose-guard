@@ -1,7 +1,8 @@
 import { createRoot } from 'react-dom/client'
 import { ResearchApp } from './ResearchApp'
+import './fonts.css'
+import './tokens.css'
 import './styles.css'
-import './a11y.css'
 import './research.css'
 import './types'
 

@@ -1,0 +1,114 @@
+/* The instrument contract: shared token schema.
+   The same variable NAMES appear in scene-narrator and realtime-3d-room with
+   different values, so the three stylesheets are structurally identical and a
+   component can be lifted between them without rewiring. Copied into each repo
+   rather than published as a package: three copies of one small file are
+   cheaper than one package plus three build wirings. Revisit at four repos. */
+
+:root {
+  color-scheme: dark;
+
+  /* Surface. Every division on the page is one hairline of --line. */
+  --ground: #0b0d0c;
+  --panel: #121512;
+  --panel-raised: #181c18;
+  --line: #2a2f2b;
+
+  /* Ink */
+  --ink: #f3f5ee;
+  --muted: #9da69e;
+  --dim: #879087;
+
+  /* Encoding. A hue may appear on the page only if it appears in a legend.
+     --accent is the correct path and the primary action. --warn is the failure
+     this package exists to prevent. --series-* are named comparison series. */
+  --accent: #d8ff53;
+  --accent-ink: #10150a;
+  --accent-wash: rgba(216, 255, 83, 0.07);
+  --warn: #ff6545;
+  --series-a: #7da8ff; /* native disposal */
+  --series-b: #cf9bff; /* naive recursion */
+  --series-c: #d8ff53; /* guarded */
+
+  /* Type. Three registers, never anything between them: chrome is mono,
+     argument is body, display appears in h1 to h3 only. */
+  --font-chrome: "Commit Mono", "Commit Mono Fallback", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --font-body: "Atkinson Next", "Atkinson Next Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Archivo", "Archivo Fallback", ui-sans-serif, system-ui, sans-serif;
+
+  --step--1: 11px;
+  --step-0: 13px;
+  --step-1: clamp(17px, 1.7vw, 21px);
+  --step-2: clamp(21px, 2.2vw, 28px);
+  --step-3: clamp(30px, 4vw, 48px);
+  --step-4: clamp(38px, 5vw, 64px);
+  /* Calibrated against Archivo's real metrics. The previous 6.4vw/88px was set
+     while no web font loaded, so it was measured against whatever grotesque the
+     machine happened to have. Archivo is wider, and at the old size the hero's
+     second line wrapped and broke the one voice moment across two lines. */
+  --step-5: clamp(44px, 5vw, 72px);
+
+  /* Wide positive tracking on mono chrome against tight negative tracking on
+     display type is the signature. -0.03em is the floor: below that, letters
+     touch at 88px. */
+  --track-chrome: 0.11em;
+  --track-display: -0.03em;
+
+  /* Space. Two scales, never mixed. The test is whether the block contains a
+     number: numbers get --gutter, sentences get --gap-prose. */
+  --gutter: 12px;
+  --gap-prose: clamp(40px, 5vw, 100px);
+  --pad-section: clamp(76px, 9vw, 132px);
+  --pad-panel: 16px;
+  --container: min(1180px, 100% - 48px);
+
+  /* Rows. Fixed heights on anything that repeats or updates, so a live table
+     holds its grid instead of reflowing every tick. */
+  --row-sm: 56px;
+  --row-md: 58px;
+  --row-lg: 82px;
+  --row-bar: 78px;
+  --row-head: 76px;
+
+  /* Motion. One duration, one curve, one gesture. */
+  --t: 180ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Texture. One, at 2%, panel interiors only, never on prose. */
+  --texture: rgba(255, 255, 255, 0.02);
+
+  --z-canvas: 0;
+  --z-panel: 10;
+  --z-sticky: 20;
+  --z-overlay: 40;
+  --z-modal: 50;
+
+  /* Names the existing stylesheet already uses. Kept as aliases so the port is
+     incremental rather than one unreviewable diff. New rules use the shared
+     names above. */
+  --acid: var(--accent);
+  --acid-ink: var(--accent-ink);
+  --orange: var(--warn);
+  --blue: var(--series-a);
+  --mono: var(--font-chrome);
+
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: var(--ground);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+/* Scene motion and replay are content, so they are exempt from the 180ms rule
+   but not from this. The JS flag lets WebGL scenes read the same preference and
+   turn autoplay into a play button. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

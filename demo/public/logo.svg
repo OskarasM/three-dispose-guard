@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="three-dispose-guard">
+  <title>three-dispose-guard</title>
+  <!-- Nested rings around a held core: owners, borrowers, protections. The core
+       is only released when every ring around it is gone. -->
+  <g fill="none" stroke="currentColor" stroke-width="4">
+    <circle cx="32" cy="32" r="26"/>
+    <circle cx="32" cy="32" r="14"/>
+  </g>
+  <circle cx="32" cy="32" r="5" fill="currentColor"/>
+</svg>

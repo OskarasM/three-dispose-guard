@@ -1,6 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#0b0d0c"/>
-  <circle cx="32" cy="32" r="21" fill="none" stroke="#75806f" stroke-width="3"/>
-  <circle cx="32" cy="32" r="11" fill="none" stroke="#d8ff53" stroke-width="3"/>
-  <circle cx="32" cy="32" r="4" fill="#d8ff53"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" fill="#0b0d0c"/>
+  <g transform="translate(32 32) scale(0.74) translate(-32 -32)">
+<!-- Nested rings around a held core: owners, borrowers, protections. The core
+       is only released when every ring around it is gone. -->
+  <g fill="none" stroke="#d8ff53" stroke-width="4">
+    <circle cx="32" cy="32" r="26"/>
+    <circle cx="32" cy="32" r="14"/>
+  </g>
+  <circle cx="32" cy="32" r="5" fill="#d8ff53"/>
+  </g>
 </svg>

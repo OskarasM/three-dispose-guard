@@ -1,0 +1,72 @@
+/* Self-hosted, latin-subset, variable where the design uses an axis.
+   Not loaded from a font CDN: this site prints exact dependency versions read
+   from package-lock.json, so serving type from an origin whose files can change
+   underneath it would contradict the rest of the page. Self-hosting also keeps
+   visitor IP addresses off a third party.
+
+   Licences ship beside the files in /fonts. Every face is SIL OFL 1.1.
+   Subsetting: latin plus the punctuation and arrows this site actually sets,
+   axes clamped to the ranges used. See scripts/check-font-budget.mjs. */
+
+/* Chrome and code. Static, because chrome only ever sets two weights. */
+@font-face {
+  font-family: "Commit Mono";
+  src: url("/fonts/commit-mono-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Commit Mono";
+  src: url("/fonts/commit-mono-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Body. Atkinson Hyperlegible Next is the Braille Institute's legibility face. */
+@font-face {
+  font-family: "Atkinson Next";
+  src: url("/fonts/atkinson-next-var.woff2") format("woff2-variations");
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Display. The weight axis carries this site's one voice moment. */
+@font-face {
+  font-family: "Archivo";
+  src: url("/fonts/archivo-var.woff2") format("woff2-variations");
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Metric-matched fallbacks, so the swap does not shift layout.
+   size-adjust is the ratio of OS/2 xAvgCharWidth between each face and its
+   fallback; the overrides are that face's own hhea metrics divided back through
+   it. Computed from the real font binaries, not estimated. */
+@font-face {
+  font-family: "Commit Mono Fallback";
+  src: local("Consolas"), local("Menlo"), local("DejaVu Sans Mono");
+  size-adjust: 109.13%;
+  ascent-override: 82.47%;
+  descent-override: 18.33%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Atkinson Next Fallback";
+  src: local("Arial"), local("Helvetica Neue"), local("Liberation Sans");
+  size-adjust: 118.03%;
+  ascent-override: 83.37%;
+  descent-override: 26.77%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Archivo Fallback";
+  src: local("Arial"), local("Helvetica Neue"), local("Liberation Sans");
+  size-adjust: 119.62%;
+  ascent-override: 73.40%;
+  descent-override: 17.56%;
+  line-gap-override: 0%;
+}
