@@ -45,32 +45,6 @@ code,
 pre {
   font-family: var(--mono);
 }
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-.skip-link {
-  position: fixed;
-  z-index: 100;
-  top: 10px;
-  left: 10px;
-  padding: 12px 16px;
-  color: var(--acid-ink);
-  background: var(--acid);
-  transform: translateY(-150%);
-}
-
-.skip-link:focus {
-  transform: translateY(0);
-}
 
 :focus-visible {
   outline: 2px solid var(--acid);
@@ -83,90 +57,6 @@ pre {
   margin-inline: auto;
 }
 
-.site-header {
-  min-height: 76px;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  border-bottom: 1px solid var(--line);
-}
-
-.brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  width: fit-content;
-  min-height: 44px;
-  font-family: var(--mono);
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-}
-
-.brand-accent {
-  color: var(--acid);
-}
-
-.brand-mark {
-  width: 24px;
-  height: 24px;
-  position: relative;
-  display: grid;
-  place-items: center;
-  border: 1px solid #64705f;
-  border-radius: 50%;
-}
-
-.brand-mark::before,
-.brand-mark::after,
-.brand-mark span {
-  content: "";
-  position: absolute;
-  border-radius: 50%;
-}
-
-.brand-mark::before {
-  width: 12px;
-  height: 12px;
-  border: 1px solid var(--acid);
-}
-
-.brand-mark::after {
-  width: 4px;
-  height: 4px;
-  background: var(--acid);
-}
-
-.site-header nav {
-  display: flex;
-  align-items: center;
-  gap: 30px;
-}
-
-.site-header nav a,
-.header-link,
-.footer-links a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 12px;
-  transition: color 180ms ease;
-}
-
-.site-header nav a:hover,
-.header-link:hover,
-.footer-links a:hover {
-  color: var(--ink);
-}
-
-.header-link {
-  justify-self: end;
-  gap: 8px;
-  color: var(--ink);
-}
-
 .hero {
   display: grid;
   /* The copy column carries the display line, so it takes the larger share.
@@ -177,28 +67,6 @@ pre {
   align-items: center;
   min-height: 720px;
   padding-block: 86px 92px;
-}
-.eyebrow,
-.section-number {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.5;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.eyebrow {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.eyebrow span {
-  padding: 5px 8px;
-  color: var(--acid-ink);
-  background: var(--acid);
 }
 
 h1,
@@ -242,15 +110,6 @@ h1 em {
   margin-top: 36px;
 }
 
-.install-command {
-  min-width: 0;
-  min-height: 48px;
-  display: flex;
-  align-items: stretch;
-  border: 1px solid var(--line);
-  background: #101310;
-}
-
 .hero-actions code {
   display: flex;
   align-items: center;
@@ -258,54 +117,6 @@ h1 em {
   padding: 0 16px;
   color: #bfc6bd;
   font-size: 12px;
-}
-
-.copy-button {
-  min-width: 72px;
-  min-height: 46px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 0 12px;
-  color: var(--ink);
-  border: 0;
-  border-left: 1px solid var(--line);
-  background: #171b17;
-  font-family: var(--mono);
-  font-size: 11px;
-  cursor: pointer;
-  transition: color 180ms ease, background-color 180ms ease;
-}
-
-.copy-button:hover {
-  color: var(--acid);
-  background: #1c211c;
-}
-
-.button {
-  min-height: 48px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 0 20px;
-  border: 1px solid transparent;
-  border-radius: 0;
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease, transform 180ms ease;
-}
-
-.button:hover:not(:disabled) {
-  transform: translateY(-2px);
-}
-
-.button:disabled {
-  cursor: wait;
-  opacity: 0.72;
 }
 
 .button-primary {
@@ -395,15 +206,6 @@ h1 em {
   color: var(--muted);
 }
 
-.live-dot {
-  width: 7px;
-  height: 7px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--acid);
-  box-shadow: 0 0 0 4px rgba(216, 255, 83, 0.12);
-}
-
 .visual-label-bottom {
   left: 30px;
   right: 30px;
@@ -473,14 +275,6 @@ h1 em {
 .guide {
   padding-block: 132px;
 }
-
-.section-heading {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
-  gap: 70px;
-  align-items: end;
-  margin-bottom: 50px;
-}
 .section-heading h2,
 .cta h2 {
   max-width: 850px;
@@ -489,11 +283,6 @@ h1 em {
   line-height: 1.02;
   letter-spacing: var(--track-display);
   font-weight: 580;
-}
-.section-heading > p {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.65;
 }
 
 .lab-panel {
@@ -611,31 +400,8 @@ h1 em {
   font-size: 13px;
 }
 
-.error-message {
-  margin: 0;
-  padding: 14px 22px;
-  color: #ffc4b7;
-  background: rgba(255, 101, 69, 0.12);
-}
-
 .ownership {
   border-top: 1px solid var(--line);
-}
-
-.code-header {
-  min-height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 22px;
-  border-bottom: 1px solid var(--line);
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 10px;
-}
-
-.code-status {
-  color: var(--acid);
 }
 
 .guide {
@@ -707,27 +473,6 @@ h1 em {
 .button-large:hover {
   color: var(--acid);
   background: #101310;
-}
-
-.site-footer {
-  min-height: 150px;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 30px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.site-footer p {
-  margin: 0;
-}
-
-.footer-links {
-  justify-self: end;
-  display: flex;
-  align-items: center;
-  gap: var(--gutter);
 }
 
 @media (max-width: 1024px) {
@@ -926,19 +671,5 @@ h1 em {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
-  }
-}
-
-/* The sibling sites sit before a hairline, back-to-top after it, because one
-   pair leaves this site and the other does not. */
-.footer-links a:last-child {
-  padding-left: var(--gutter);
-  border-left: 1px solid var(--line);
-}
-
-@media (max-width: 768px) {
-  .footer-links {
-    justify-self: start;
-    flex-wrap: wrap;
   }
 }
