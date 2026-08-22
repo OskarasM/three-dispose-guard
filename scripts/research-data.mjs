@@ -387,4 +387,3 @@ export function captureToCsv(capture) {
     ...rows.map((row) => csvColumns.map((column) => csvValue(row[column])).join(',')),
   ].join('\n')
 }
-

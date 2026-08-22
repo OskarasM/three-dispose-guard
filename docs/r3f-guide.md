@@ -46,6 +46,8 @@ function Scene() {
 6. Releases that borrowed lease with a microtask policy during cleanup.
 
 `GuardedPrimitive` supplies `dispose={null}`. Do not render the same guarded result through an ordinary `<primitive>` that allows R3F to dispose it independently.
+You may pass a loader constructor or a stable loader instance. Use the same representation for `useGuardedLoader`, `cache.preload` and `cache.evict` so the application expresses one cache key consistently.
+
 
 ## Preload and eviction
 
@@ -61,6 +63,8 @@ Eviction clears the exact R3F cache key first, then releases the registry protec
 Use `cache.clear()` to evict every entry owned by that guard.
 
 Do not call `useLoader.clear` directly for a guarded entry. The registry would not learn that the external cache stopped owning the result.
+Loading, preloading and clearing all use the guard's same instrumented loader representation. This is especially important for configured loader instances.
+
 
 ## In-flight eviction
 
@@ -73,7 +77,9 @@ When eviction occurs before resolution:
 3. The result is temporarily adopted as owned.
 4. Microtask finalisation cleans it after any same-tick consumer has had an opportunity to claim it.
 
-The browser lab and integration suite exercise this flow with a deterministic loader.
+Rejected loads propagate their original error, create no cache protection and may be retried as a fresh generation. For array inputs, late sibling completions from a rejected generation are also cleaned.
+
+The browser lab and integration suite exercise these flows with deterministic loaders.
 
 ## Strict Mode
 

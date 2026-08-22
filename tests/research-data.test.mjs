@@ -225,4 +225,3 @@ describe('research capture data', () => {
     expect(schema.$defs.scenarioReport.properties.comparisons.maxItems).toBe(4)
   })
 })
-

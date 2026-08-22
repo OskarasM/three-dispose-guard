@@ -6,6 +6,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { spawnSync } from 'node:child_process'
+import { build as buildWithEsbuild } from 'esbuild'
 
 const root = process.cwd()
 const packageJson = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'))
@@ -59,6 +60,31 @@ const coreBundles = [
 
 for (const bundle of coreBundles) {
   assert.doesNotMatch(bundle, /@react-three\/fiber|from\s*["']react["']|require\(["']react["']\)/)
+}
+
+const treeShakeResult = await buildWithEsbuild({
+  stdin: {
+    contents: "import { createResourceRegistry } from './dist/index.js'; console.log(createResourceRegistry)",
+    resolveDir: root,
+    sourcefile: 'consumer.mjs',
+  },
+  bundle: true,
+  format: 'esm',
+  metafile: true,
+  minify: true,
+  platform: 'browser',
+  treeShaking: true,
+  write: false,
+})
+
+const treeShakenBundle = treeShakeResult.outputFiles[0]?.text ?? ''
+assert.ok(treeShakenBundle.length > 0, 'Tree-shaken core consumer bundle was empty.')
+assert.doesNotMatch(treeShakenBundle, /@react-three\/fiber|react-dom|GuardedPrimitive/)
+for (const input of Object.keys(treeShakeResult.metafile.inputs)) {
+  assert.doesNotMatch(
+    input.replaceAll('\\', '/'),
+    /node_modules\/(?:react|react-dom|@react-three\/fiber|three)\//,
+  )
 }
 
 const esmCore = await import(pathToFileURL(path.join(root, 'dist/index.js')).href)
@@ -118,6 +144,17 @@ try {
       false,
       `Core-only install unexpectedly included peer ${absentPeer}`,
     )
+  }
+
+
+  const consumerRequire = createRequire(path.join(temporaryRoot, 'package.json'))
+  for (const specifier of [
+    'three-dispose-guard',
+    'three-dispose-guard/react',
+    'three-dispose-guard/r3f',
+    'three-dispose-guard/package.json',
+  ]) {
+    assert.doesNotThrow(() => consumerRequire.resolve(specifier), `Unresolvable export: ${specifier}`)
   }
 
   run(nodeCommand, ['--input-type=module', '-e', "import('three-dispose-guard').then(m => { if (typeof m.createResourceRegistry !== 'function') process.exit(1) })"], { cwd: temporaryRoot })

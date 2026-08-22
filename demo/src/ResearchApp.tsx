@@ -1,20 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { BenchmarkVariant, MemorySample } from './webgl-lab'
-import { mountHeroScene } from './webgl-lab'
-import {
-  downloadResearchSuite,
-  runResearchSuite,
-  runScenario,
-  scenarios,
-  type ResearchSuite,
-  type ScenarioId,
-  type ScenarioReport,
-} from './research-lab'
+import { scenarios, type ScenarioId } from './research-model'
+import type { ResearchSuite, ScenarioReport } from './research-lab'
 
 const variantMeta: Record<BenchmarkVariant, { label: string; className: string }> = {
   unmanaged: { label: 'unmanaged', className: 'series-unmanaged' },
   naive: { label: 'naïve eager', className: 'series-naive' },
-  native: { label: 'declarative-style', className: 'series-native' },
+  native: { label: 'native R3F', className: 'series-native' },
   guarded: { label: 'Dispose Guard', className: 'series-guarded' },
 }
 
@@ -26,6 +18,13 @@ const flowByScenario: Record<ScenarioId, readonly string[]> = {
   churn: ['acquire next', 'release previous', 'repeat', 'evict pool'],
   'in-flight': ['request', 'evict', 'late resolve', 'clean stale'],
 }
+const variants = Object.keys(variantMeta) as BenchmarkVariant[]
+const installCommand = 'npm i three-dispose-guard'
+const apiGuideUrl = 'https://github.com/OskarasM/three-dispose-guard/blob/main/docs/api.md'
+const r3fGuideUrl = 'https://github.com/OskarasM/three-dispose-guard/blob/main/docs/r3f-guide.md'
+
+const formatElapsed = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+
 
 function ArrowIcon() {
   return (
@@ -39,6 +38,14 @@ function DownloadIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18">
       <path d="M10 3v9m0 0 4-4m-4 4L6 8M4 15h12" fill="none" stroke="currentColor" strokeWidth="1.7" />
+    </svg>
+  )
+}
+function CopyIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" width="16" height="16">
+      <rect x="6" y="6" width="9" height="9" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M4 12H3V3h9v1" fill="none" stroke="currentColor" strokeWidth="1.5" />
     </svg>
   )
 }
@@ -63,12 +70,26 @@ function HeroScene() {
       return
     }
 
-    try {
-      const unmount = mountHeroScene(canvas)
-      setWebglStatus('live')
-      return unmount
-    } catch {
-      setWebglStatus('fallback')
+    let cancelled = false
+    let unmount: (() => void) | undefined
+
+    void import('./webgl-lab')
+      .then(({ mountHeroScene }) => {
+        if (cancelled) return
+        try {
+          unmount = mountHeroScene(canvas)
+          setWebglStatus('live')
+        } catch {
+          setWebglStatus('fallback')
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setWebglStatus('fallback')
+      })
+
+    return () => {
+      cancelled = true
+      unmount?.()
     }
   }, [])
 
@@ -81,6 +102,7 @@ function HeroScene() {
   return (
     <div
       className="hero-visual"
+      role="img"
       aria-label={webglStatus === 'fallback'
         ? 'Static illustration representing shared GPU ownership'
         : 'Live WebGL scene representing shared GPU ownership'}
@@ -119,6 +141,12 @@ function MemoryChart({ series, running }: MemoryChartProps) {
     const y = height - inset - (total / maxValue) * (height - inset * 2)
     return `${x},${y}`
   }).join(' ')
+  const chartDescription = all.length === 0
+    ? 'No measurement has been captured yet.'
+    : populated.map(([variant, samples]) => {
+      const final = samples.at(-1)
+      return `${variantMeta[variant].label} ends at ${(final?.geometries ?? 0) + (final?.textures ?? 0)} resources.`
+    }).join(' ')
 
   return (
     <div className="chart-wrap research-chart-wrap">
@@ -129,9 +157,7 @@ function MemoryChart({ series, running }: MemoryChartProps) {
         aria-labelledby="research-chart-title research-chart-description"
       >
         <title id="research-chart-title">Three.js resource count by mount cycle</title>
-        <desc id="research-chart-description">
-          Four lines compare unmanaged, eager, declarative-style and ownership-guarded cleanup.
-        </desc>
+        <desc id="research-chart-description">{chartDescription}</desc>
         {[0, 1, 2, 3, 4].map((line) => {
           const y = inset + (line / 4) * (height - inset * 2)
           return <line key={line} x1={inset} x2={width - inset} y1={y} y2={y} className="grid-line" />
@@ -161,26 +187,28 @@ function MemoryChart({ series, running }: MemoryChartProps) {
 function ScenarioPicker({
   selected,
   onSelect,
+  disabled,
 }: {
   selected: ScenarioId
   onSelect: (scenario: ScenarioId) => void
+  disabled: boolean
 }) {
   return (
-    <div className="scenario-picker" role="tablist" aria-label="Research scenarios">
+    <fieldset className="scenario-picker" disabled={disabled}>
+      <legend className="sr-only">Choose a research scenario</legend>
       {scenarios.map((scenario) => (
         <button
           key={scenario.id}
           className="scenario-tab"
           type="button"
-          role="tab"
-          aria-selected={selected === scenario.id}
+          aria-pressed={selected === scenario.id}
           onClick={() => onSelect(scenario.id)}
         >
           <span>{scenario.index}</span>
           {scenario.title}
         </button>
       ))}
-    </div>
+    </fieldset>
   )
 }
 
@@ -203,6 +231,94 @@ function AssertionList({ report }: { report: ScenarioReport | null }) {
     </ul>
   )
 }
+function ComparisonTable({ report }: { report: ScenarioReport }) {
+  return (
+    <div className="metrics-table-wrap comparison-table-wrap">
+      <table className="metrics-table comparison-table">
+        <caption>Four-behaviour comparison for this scenario</caption>
+        <thead>
+          <tr>
+            <th scope="col">Behaviour</th>
+            <th scope="col">Outcome</th>
+            <th scope="col">Evidence</th>
+            <th scope="col">Interpretation</th>
+          </tr>
+        </thead>
+        <tbody>
+          {variants.map((variant) => {
+            const comparison = report.comparisons.find((item) => item.variant === variant)
+            return (
+              <tr key={variant}>
+                <th scope="row">{variantMeta[variant].label}</th>
+                <td>{comparison?.outcome.replaceAll('-', ' ') ?? 'not reported'}</td>
+                <td>{comparison?.measured ? 'Measured' : 'Not measured'}</td>
+                <td>{comparison?.detail ?? 'No comparison was reported.'}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+
+function ResourceMetricsTable({ totals }: { totals: Record<BenchmarkVariant, number> }) {
+  return (
+    <div className="metrics-table-wrap">
+      <table className="metrics-table">
+        <caption>Final Three.js resource count after the selected run</caption>
+        <thead>
+          <tr>
+            <th scope="col">Behaviour</th>
+            <th scope="col">Final resources</th>
+          </tr>
+        </thead>
+        <tbody>
+          {variants.map((variant) => (
+            <tr key={variant}>
+              <th scope="row">
+                <span className="series-key">
+                  <i className={variantMeta[variant].className} aria-hidden="true" />
+                  {variantMeta[variant].label}
+                </span>
+              </th>
+              <td><strong>{totals[variant]}</strong></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function SuiteSummaryTable({ suite }: { suite: ResearchSuite }) {
+  return (
+    <div className="suite-summary">
+      <table>
+        <caption>Five-run final resource-count summary</caption>
+        <thead>
+          <tr>
+            <th scope="col">Behaviour</th>
+            <th scope="col">Mean</th>
+            <th scope="col">Range</th>
+            <th scope="col">Variance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {variants.map((variant) => (
+            <tr key={variant}>
+              <th scope="row">{variantMeta[variant].label}</th>
+              <td>{suite.summary[variant].mean.toFixed(1)}</td>
+              <td>{suite.summary[variant].minimum}–{suite.summary[variant].maximum}</td>
+              <td>{suite.summary[variant].variance.toFixed(2)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 function downloadScenario(report: ScenarioReport): void {
   const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' })
@@ -222,24 +338,55 @@ export function ResearchApp() {
   const [running, setRunning] = useState(false)
   const [suiteRunning, setSuiteRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const [suiteElapsedSeconds, setSuiteElapsedSeconds] = useState(0)
+  const suiteStartedAt = useRef<number | null>(null)
+  const activeOperation = useRef(false)
   const definition = useMemo(
     () => scenarios.find((scenario) => scenario.id === selected) ?? scenarios[0],
     [selected],
   )
 
+  useEffect(() => {
+    if (!suiteRunning || suiteStartedAt.current === null) return
+
+    const updateElapsed = () => {
+      if (suiteStartedAt.current !== null) {
+        setSuiteElapsedSeconds(Math.floor((performance.now() - suiteStartedAt.current) / 1000))
+      }
+    }
+    const interval = window.setInterval(updateElapsed, 1_000)
+    updateElapsed()
+    return () => window.clearInterval(interval)
+  }, [suiteRunning])
+
   const selectScenario = (scenario: ScenarioId) => {
+    if (activeOperation.current) return
     setSelected(scenario)
     setReport(null)
     setSeries({})
     setError(null)
   }
 
+
+  const copyInstallCommand = async () => {
+    try {
+      if (!navigator.clipboard) throw new Error('Clipboard API unavailable')
+      await navigator.clipboard.writeText(installCommand)
+      setCopyStatus('copied')
+    } catch {
+      setCopyStatus('failed')
+    }
+  }
   const startScenario = async () => {
+    if (activeOperation.current) return
+    activeOperation.current = true
     setRunning(true)
     setReport(null)
     setSeries({})
     setError(null)
     try {
+      const { runScenario } = await import('./research-lab')
       const next = await runScenario(selected, 50, (variant, sample) => {
         setSeries((current) => ({
           ...current,
@@ -251,35 +398,66 @@ export function ResearchApp() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'The WebGL proof could not run.')
     } finally {
+      activeOperation.current = false
       setRunning(false)
     }
   }
 
   const startSuite = async () => {
+    if (activeOperation.current) return
+    activeOperation.current = true
+    suiteStartedAt.current = performance.now()
+    setSuiteElapsedSeconds(0)
     setSuiteRunning(true)
     setSuite(null)
     setError(null)
     try {
+      const { runResearchSuite } = await import('./research-lab')
       setSuite(await runResearchSuite(5, 50))
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'The research suite could not run.')
     } finally {
+      if (suiteStartedAt.current !== null) {
+        setSuiteElapsedSeconds(Math.round((performance.now() - suiteStartedAt.current) / 1000))
+      }
+      suiteStartedAt.current = null
+      activeOperation.current = false
       setSuiteRunning(false)
+    }
+  }
+
+  const downloadSuite = async (format: 'json' | 'csv') => {
+    if (!suite) return
+    try {
+      const { downloadResearchSuite } = await import('./research-lab')
+      downloadResearchSuite(suite, format)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'The results could not be downloaded.')
     }
   }
 
   const benchmarkTotals = report?.benchmark
     ? Object.fromEntries(
-      (Object.keys(variantMeta) as BenchmarkVariant[]).map((variant) => {
+      variants.map((variant) => {
         const final = report.benchmark![variant].final
         return [variant, final.geometries + final.textures]
       }),
     ) as Record<BenchmarkVariant, number>
     : null
 
+  const resultStatus = running
+    ? `Running ${definition.title}.`
+    : report
+      ? `${report.title} complete. ${report.assertions.filter((item) => item.passed).length} of ${report.assertions.length} assertions passed.`
+      : `${definition.title} ready.`
+  const suiteStatus = suiteRunning
+    ? `A warm-up pass across six scenarios and five measured runs are in progress. Elapsed ${formatElapsed(suiteElapsedSeconds)}.`
+    : suite
+      ? `Full suite complete in ${formatElapsed(suiteElapsedSeconds)}.`
+      : 'The full suite warms up all six scenarios, then repeats each one in five measured runs.'
+
   return (
     <div id="top">
-      <a className="skip-link" href="#main">Skip to content</a>
       <header className="site-header">
         <a className="brand" href="#top" aria-label="Dispose Guard home">
           <span className="brand-mark" aria-hidden="true"><span /></span>
@@ -306,7 +484,17 @@ export function ResearchApp() {
             </p>
             <div className="hero-actions">
               <a className="button button-primary" href="#lab">Open the research lab <ArrowIcon /></a>
-              <code>npm i three-dispose-guard</code>
+              <div className="install-command">
+                <code id="install-command">{installCommand}</code>
+                <button
+                  className="copy-button"
+                  type="button"
+                  aria-describedby="install-command"
+                  onClick={copyInstallCommand}
+                >
+                  <CopyIcon /> {copyStatus === 'copied' ? 'Copied' : copyStatus === 'failed' ? 'Copy failed' : 'Copy'}
+                </button>
+              </div>
             </div>
             <ul className="trust-list" aria-label="Package guarantees">
               <li><span aria-hidden="true">01</span> Audit-only default</li>
@@ -334,7 +522,11 @@ export function ResearchApp() {
             </p>
           </div>
 
-          <ScenarioPicker selected={selected} onSelect={selectScenario} />
+          <ScenarioPicker
+            selected={selected}
+            onSelect={selectScenario}
+            disabled={running || suiteRunning}
+          />
 
           <div className="experiment-layout">
             <article className="experiment-brief" aria-labelledby="scenario-title">
@@ -356,41 +548,49 @@ export function ResearchApp() {
                 className="button button-primary experiment-run"
                 type="button"
                 onClick={startScenario}
-                disabled={running}
+                disabled={running || suiteRunning}
               >
                 {running ? 'Running proof…' : 'Run selected proof'}
                 {!running && <ArrowIcon />}
               </button>
             </article>
 
-            <article className="lab-panel experiment-results" aria-live="polite">
+            <article className="lab-panel experiment-results">
+              <p className="sr-only" role="status" aria-live="polite">{resultStatus}</p>
               <div className="lab-toolbar">
-                <div className="chart-legend" aria-label="Chart legend">
-                  {(Object.keys(variantMeta) as BenchmarkVariant[]).map((variant) => (
-                    <span key={variant}>
-                      <i className={variantMeta[variant].className} />
-                      {variantMeta[variant].label}
-                    </span>
-                  ))}
-                </div>
+                {selected === 'unique' ? (
+                  <div className="chart-legend" aria-label="Chart legend">
+                    {variants.map((variant) => (
+                      <span key={variant}>
+                        <i className={variantMeta[variant].className} aria-hidden="true" />
+                        {variantMeta[variant].label}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="result-mode">Lifecycle assertions</span>
+                )}
                 <span className="measurement-status">
                   <i className={running ? 'live-dot is-running' : 'live-dot'} />
                   {running ? 'measuring' : report ? 'captured' : 'ready'}
                 </span>
               </div>
 
-              <MemoryChart series={series} running={running} />
-
-              {benchmarkTotals && (
-                <div className="metric-grid research-metrics">
-                  {(Object.keys(variantMeta) as BenchmarkVariant[]).map((variant) => (
-                    <div className="metric" key={variant}>
-                      <span>{variantMeta[variant].label}</span>
-                      <strong>{benchmarkTotals[variant]} resources</strong>
-                    </div>
-                  ))}
+              {selected === 'unique' ? (
+                <MemoryChart series={series} running={running} />
+              ) : (
+                <div className="proof-stage">
+                  <span className="proof-stage-kicker">HANDLE-LEVEL PROOF</span>
+                  <div className="proof-flow" aria-hidden="true">
+                    {flowByScenario[selected].map((step) => (
+                      <span key={step}>{step}</span>
+                    ))}
+                  </div>
+                  <p>This scenario reports WebGL lifecycle assertions rather than a resource-count series.</p>
                 </div>
               )}
+
+              {benchmarkTotals && <ResourceMetricsTable totals={benchmarkTotals} />}
 
               <div className="proof-panel">
                 <div className="proof-heading">
@@ -405,6 +605,7 @@ export function ResearchApp() {
                   )}
                 </div>
                 <AssertionList report={report} />
+                {report && <ComparisonTable report={report} />}
                 {report && (
                   <div className="evidence-note">
                     <span>{report.renderer}</span>
@@ -461,35 +662,35 @@ export function ResearchApp() {
                 className="button button-secondary"
                 type="button"
                 onClick={startSuite}
-                disabled={suiteRunning}
+                disabled={suiteRunning || running}
               >
-                {suiteRunning ? 'Running full suite…' : 'Run five-run suite'}
+                {suiteRunning ? `Running · ${formatElapsed(suiteElapsedSeconds)}` : 'Run five-run suite'}
               </button>
               {suite && (
                 <>
-                  <button className="text-button" type="button" onClick={() => downloadResearchSuite(suite, 'json')}>
+                  <button className="text-button" type="button" onClick={() => void downloadSuite('json')}>
                     <DownloadIcon /> JSON
                   </button>
-                  <button className="text-button" type="button" onClick={() => downloadResearchSuite(suite, 'csv')}>
+                  <button className="text-button" type="button" onClick={() => void downloadSuite('csv')}>
                     <DownloadIcon /> CSV
                   </button>
                 </>
               )}
             </div>
-            {suite && (
-              <div className="suite-summary" aria-live="polite">
-                {(Object.keys(variantMeta) as BenchmarkVariant[]).map((variant) => (
-                  <div key={variant}>
-                    <span>{variantMeta[variant].label}</span>
-                    <strong>{suite.summary[variant].mean.toFixed(1)}</strong>
-                    <small>
-                      range {suite.summary[variant].minimum}–{suite.summary[variant].maximum},
-                      variance {suite.summary[variant].variance.toFixed(2)}
-                    </small>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="suite-progress" role="status" aria-live="polite">
+              <p>{suiteStatus}</p>
+              {suiteRunning && (
+                <div
+                  className="suite-progress-track"
+                  role="progressbar"
+                  aria-label="Full research suite"
+                  aria-valuetext={suiteStatus}
+                >
+                  <span />
+                </div>
+              )}
+            </div>
+            {suite && <SuiteSummaryTable suite={suite} />}
           </div>
         </section>
 
@@ -506,6 +707,14 @@ export function ResearchApp() {
               <li><span>02</span><div><h3>Provide</h3><p>Share one cache guard across every consumer of the same loader entries.</p></div></li>
               <li><span>03</span><div><h3>Evict</h3><p>Clear through the guard when the application cache policy expires.</p></div></li>
             </ol>
+            <nav className="quickstart-links" aria-label="Developer documentation">
+              <a href={r3fGuideUrl}>
+                R3F migration guide <ArrowIcon />
+              </a>
+              <a href={apiGuideUrl}>
+                API reference <ArrowIcon />
+              </a>
+            </nav>
           </div>
           <article className="quickstart-code">
             <div className="code-header">

@@ -3,15 +3,15 @@
 ## Set up
 
 ```bash
-npm install
+npm ci
 npm run check
 ```
 
-Install Chromium once before browser tests:
+Install the supported browsers once before browser tests:
 
 ```bash
-npx playwright install chromium
-npm run test:browser
+npx playwright install chromium firefox webkit
+npm run test:browser:all
 ```
 
 ## Correctness rule
@@ -20,10 +20,16 @@ A change that expands disposal behaviour must include an over-disposal test. At 
 
 Do not add runtime dependencies without discussing the trade-off first. Keep Three.js and React as peer dependencies.
 
+Changes to loader instrumentation must also cover overlapping requests, array inputs, rejection and stale generations.
+
 ## Measurement rule
 
 Do not add a performance or memory number to the README unless it came from a committed harness run. Record the browser, operating system, GPU renderer, number of cycles, fixed inputs and capture time. Describe `renderer.info.memory` values as resource counts, not bytes or direct driver memory.
 
+
+Schema-v2 captures must contain every variant for every scenario. Use an explicit `not-measured` or `not-applicable` comparison where a variant has no honest implementation.
+
+The JSON file is authoritative. The committed CSV must be generated from it and pass `npm run benchmark:verify`.
 
 ## R3F cache rule
 
@@ -39,10 +45,12 @@ Also cover rejection or eviction while the loader callback is still pending.
 
 ```bash
 npm run check
-npm run test:browser
+npm run test:browser:all
+npm run package:check
+npm run benchmark:verify
 npm pack --dry-run
 ```
 
-When measurements change, generate a new dated capture and chart. Do not edit raw JSON, CSV or reported values by hand.
+When measurements change, generate a new dated capture from a clean commit, update the chart and reference manifest, then verify the result. Do not edit raw JSON, CSV or reported values by hand.
 
 Keep documentation in British English and avoid claims that imply every R3F scene requires this package.
