@@ -9,7 +9,7 @@ declare global {
   interface Window {
     __disposeGuard: {
       runBenchmark: (cycles?: number) => Promise<BenchmarkReport>
-      runSharedProof: () => SharedAssetProof
+      runSharedProof: () => Promise<SharedAssetProof>
       runScenario: (scenario: ScenarioId, cycles?: number) => Promise<ScenarioReport>
       runResearchSuite: (runs?: number, cyclesPerRun?: number) => Promise<ResearchSuite>
     }
