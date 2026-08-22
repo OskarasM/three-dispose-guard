@@ -323,6 +323,79 @@ describe('R3FResourceCache', () => {
     first.clear()
   })
 
+  it('ignores eviction from a guard that does not own the key', async () => {
+    const ownerRegistry = createResourceRegistry({ mode: 'dispose' })
+    const owner = createR3FResourceCache({ registry: ownerRegistry })
+    const outsider = createR3FResourceCache({
+      registry: createResourceRegistry({ mode: 'dispose' }),
+    })
+
+    owner.preload(ImmediateLoader, '/unowned-eviction.glb')
+    await vi.waitFor(() => expect(owner.snapshot().ready).toBe(1))
+
+    outsider.evict(ImmediateLoader, '/unowned-eviction.glb')
+
+    function Subject() {
+      const asset = useGuardedLoader(ImmediateLoader, '/unowned-eviction.glb')
+      return <GuardedPrimitive object={asset.scene} />
+    }
+
+    const renderer = await ReactThreeTestRenderer.create(
+      <R3FResourceCacheProvider cache={owner}>
+        <Suspense fallback={null}>
+          <Subject />
+        </Suspense>
+      </R3FResourceCacheProvider>,
+    )
+
+    await vi.waitFor(() => expect(ownerRegistry.snapshot().activeLeases).toBe(1))
+    expect(ImmediateLoader.loaded).toHaveLength(1)
+
+    await renderer.unmount()
+    await Promise.resolve()
+    owner.evict(ImmediateLoader, '/unowned-eviction.glb')
+    expect(ImmediateLoader.loaded[0].textureDispose).toHaveBeenCalledOnce()
+  })
+
+  it('keeps a replacement owner intact after a stale repeated eviction', async () => {
+    const first = createR3FResourceCache({
+      registry: createResourceRegistry({ mode: 'dispose' }),
+    })
+    const secondRegistry = createResourceRegistry({ mode: 'dispose' })
+    const second = createR3FResourceCache({ registry: secondRegistry })
+
+    first.preload(ImmediateLoader, '/transferred-eviction.glb')
+    await vi.waitFor(() => expect(first.snapshot().ready).toBe(1))
+    first.evict(ImmediateLoader, '/transferred-eviction.glb')
+
+    second.preload(ImmediateLoader, '/transferred-eviction.glb')
+    await vi.waitFor(() => expect(second.snapshot().ready).toBe(1))
+    expect(ImmediateLoader.loaded).toHaveLength(2)
+
+    first.evict(ImmediateLoader, '/transferred-eviction.glb')
+
+    function Subject() {
+      const asset = useGuardedLoader(ImmediateLoader, '/transferred-eviction.glb')
+      return <GuardedPrimitive object={asset.scene} />
+    }
+
+    const renderer = await ReactThreeTestRenderer.create(
+      <R3FResourceCacheProvider cache={second}>
+        <Suspense fallback={null}>
+          <Subject />
+        </Suspense>
+      </R3FResourceCacheProvider>,
+    )
+
+    await vi.waitFor(() => expect(secondRegistry.snapshot().activeLeases).toBe(1))
+    expect(ImmediateLoader.loaded).toHaveLength(2)
+
+    await renderer.unmount()
+    await Promise.resolve()
+    second.evict(ImmediateLoader, '/transferred-eviction.glb')
+    expect(ImmediateLoader.loaded[1].textureDispose).toHaveBeenCalledOnce()
+  })
+
   it('borrows a guarded loader result for the mounted R3F consumer', async () => {
     const registry = createResourceRegistry({ mode: 'dispose' })
     const cache = createR3FResourceCache({ registry })

@@ -207,8 +207,8 @@ class R3FResourceCacheImpl implements R3FResourceCache {
     const key = requestKey(input)
     const entries = this.entries.get(loader)
     const entry = entries?.get(key)
-    useLoader.clear(entry?.r3fLoader ?? r3fLoaderRepresentation(loader), input)
     if (!entry) return
+    useLoader.clear(entry.r3fLoader, input)
 
     entry.status = 'evicted'
     entries?.delete(key)
