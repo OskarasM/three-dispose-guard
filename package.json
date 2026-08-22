@@ -84,7 +84,8 @@
     "release:check": "npm run check && npm run test:browser:all && npm run package:check && npm run benchmark:chart",
     "benchmark:chart": "node scripts/render-benchmark-chart.mjs",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm test && npm run build && npm run demo:build"
+    "check": "npm run typecheck && npm run check:fonts && npm test && npm run build && npm run demo:build",
+    "check:fonts": "node scripts/check-font-budget.mjs"
   },
   "peerDependencies": {
     "@react-three/fiber": ">=8 <10",
