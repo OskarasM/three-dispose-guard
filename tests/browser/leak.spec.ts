@@ -170,6 +170,34 @@ test('the compact research suite exposes raw runs, variance and proofs', async (
   expect(suite.proofs.every((proof) => proof.assertions.every((item) => item.passed))).toBe(true)
 })
 
+test('mounted R3F stories hold ownership against a real WebGL driver', async ({ page }) => {
+  const failures: string[] = []
+  page.on('pageerror', (error) => failures.push(error.message))
+
+  await page.goto('/')
+  const report = await page.evaluate(() => window.__disposeGuard.runR3FStories())
+
+  expect(report.assertions.map((assertion) => assertion.label)).toEqual([
+    'One mounted asset serves two consumers',
+    'The driver allocated a real WebGL texture',
+    'The surviving consumer keeps the same WebGL handle',
+    'Zero consumers does not imply eviction',
+    'A later mount reuses the cached allocation',
+    'A same-tick unmount and remount disposes nothing',
+    'Eviction under a live consumer is deferred',
+    'The final release disposes each resource exactly once',
+    'The native WebGL texture is released',
+    'A mount after eviction loads a new asset',
+    'A Canvas remount rebuilds a working renderer',
+  ])
+
+  for (const assertion of report.assertions) {
+    expect(assertion.passed, `${assertion.label}: ${assertion.detail}`).toBe(true)
+  }
+
+  expect(failures).toEqual([])
+})
+
 for (const width of [375, 768, 1024, 1440]) {
   test(`the page has no horizontal overflow at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
