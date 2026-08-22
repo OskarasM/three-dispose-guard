@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: >-
+  If you use three-dispose-guard or its benchmark dataset, please cite this
+  software and identify the capture file and captureId used.
+title: three-dispose-guard
+type: software
+version: 0.1.0
+authors:
+  - family-names: Margevicius
+    given-names: Oskaras
+repository-code: https://github.com/OskarasM/three-dispose-guard
+url: https://three-dispose-guard.vercel.app
+license: MIT
+keywords:
+  - Three.js
+  - React Three Fiber
+  - WebGL
+  - GPU resource ownership
+  - disposal
+  - reproducible research
+preferred-citation:
+  type: software
+  title: "three-dispose-guard: ownership-aware GPU resource disposal for Three.js"
+  version: 0.1.0
+  authors:
+    - family-names: Margevicius
+      given-names: Oskaras
+  repository-code: https://github.com/OskarasM/three-dispose-guard

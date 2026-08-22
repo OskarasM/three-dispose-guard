@@ -3,11 +3,17 @@ import path from 'node:path'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { chromium } from '@playwright/test'
 import { createServer } from 'vite'
+import {
+  buildCaptureDocument,
+  captureToCsv,
+  createCaptureBaseName,
+  ensureUniqueOutputBaseName,
+  readProjectProvenance,
+  validateCaptureDocument,
+} from './research-data.mjs'
 
 const root = process.cwd()
 const outputDirectory = path.join(root, 'benchmarks', 'results')
-const date = new Date().toISOString().slice(0, 10)
-const baseName = `${date}-windows-chromium`
 const port = 4180
 
 const server = await createServer({
@@ -27,78 +33,61 @@ try {
   const page = await browser.newPage()
   await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' })
   const suite = await page.evaluate(() => window.__disposeGuard.runResearchSuite(5, 50))
+  const capturedAt = new Date()
+  const provenance = await readProjectProvenance(root, capturedAt)
   const cpu = os.cpus()[0]
-  const captured = {
-    ...suite,
-    environment: {
-      os: `${os.type()} ${os.release()} ${os.arch()}`,
-      cpu: cpu?.model ?? 'not reported',
-      logicalProcessors: os.cpus().length,
-      totalMemoryGiB: Number((os.totalmem() / 1024 ** 3).toFixed(2)),
-      browser: 'Chromium',
-      browserVersion: browser.version(),
-      headless: true,
-    },
+  const environment = {
+    os: `${os.type()} ${os.release()} ${os.arch()}`,
+    platform: os.platform(),
+    cpu: cpu?.model.trim() || 'not reported',
+    logicalProcessors: os.cpus().length,
+    totalMemoryGiB: Number((os.totalmem() / 1024 ** 3).toFixed(2)),
+    browser: 'Chromium',
+    browserVersion: browser.version(),
+    headless: true,
+    gpuRenderer: suite.renderer,
   }
 
-  const variants = ['unmanaged', 'naive', 'native', 'guarded']
-  const header = [
-    'run',
-    'variant',
-    'cycle',
-    'geometries',
-    'textures',
-    'programs',
-    'measured_at',
-    'renderer',
-    'browser',
-    'host_os',
-    'host_cpu',
-    'browser_version',
-  ]
-  const rows = captured.benchmarks.flatMap((report, run) =>
-    variants.flatMap((variant) =>
-      report[variant].samples.map((sample) => [
-        run + 1,
-        variant,
-        sample.cycle,
-        sample.geometries,
-        sample.textures,
-        sample.programs,
-        report.measuredAt,
-        report.renderer,
-        report.browser,
-        captured.environment.os,
-        captured.environment.cpu,
-        captured.environment.browserVersion,
-      ]),
-    ),
-  )
-  const csv = [header, ...rows]
-    .map((row) => row.map((value) => JSON.stringify(String(value))).join(','))
-    .join('\n')
-
   await mkdir(outputDirectory, { recursive: true })
-  await writeFile(
-    path.join(outputDirectory, `${baseName}.json`),
-    `${JSON.stringify(captured, null, 2)}\n`,
-    'utf8',
-  )
-  await writeFile(path.join(outputDirectory, `${baseName}.csv`), `${csv}\n`, 'utf8')
+  const candidate = createCaptureBaseName({
+    capturedAt,
+    platform: os.platform(),
+    browser: environment.browser,
+    commit: provenance.git.commit,
+    dirty: provenance.git.workingTreeDirty,
+  })
+  const baseName = await ensureUniqueOutputBaseName(outputDirectory, candidate)
+  const captured = buildCaptureDocument({
+    suite,
+    environment,
+    provenance,
+    capturedAt: capturedAt.toISOString(),
+    captureId: baseName,
+  })
+  const validationErrors = validateCaptureDocument(captured, { requirePassing: true })
+  if (validationErrors.length > 0) {
+    throw new Error(`Capture validation failed:\n- ${validationErrors.join('\n- ')}`)
+  }
 
-  const summary = Object.fromEntries(
-    variants.map((variant) => [variant, captured.summary[variant]]),
-  )
+  const jsonPath = path.join(outputDirectory, `${baseName}.json`)
+  const csvPath = path.join(outputDirectory, `${baseName}.csv`)
+  await writeFile(jsonPath, `${JSON.stringify(captured, null, 2)}\n`, 'utf8')
+  await writeFile(csvPath, `${captureToCsv(captured)}\n`, 'utf8')
+
   console.log(JSON.stringify({
-    json: path.join('benchmarks', 'results', `${baseName}.json`),
-    csv: path.join('benchmarks', 'results', `${baseName}.csv`),
+    json: path.relative(root, jsonPath),
+    csv: path.relative(root, csvPath),
+    captureId: captured.captureId,
     renderer: captured.renderer,
     environment: captured.environment,
-    summary,
-    proofPasses: captured.proofs.map((proof) => ({
-      scenario: proof.scenario,
-      passed: proof.assertions.every((assertion) => assertion.passed),
-    })),
+    provenance: captured.provenance,
+    summary: captured.summary,
+    scenarioPasses: Object.fromEntries(
+      Object.entries(captured.scenarioSummary).map(([scenario, summary]) => [
+        scenario,
+        summary.failedAssertions === 0,
+      ]),
+    ),
   }, null, 2))
 } finally {
   await browser.close()
