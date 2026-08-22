@@ -8,11 +8,25 @@ Checkpoint-only file: read this first, then remove it before opening the public 
 
 - Working clone: `C:\Users\om117\Documents\Codex\2026-08-21\files-mentioned-by-the-user-build\three-dispose-guard`
 - Branch: `release/v0.1.0-completion`
+- Implementation checkpoint: `7de6855 chore: checkpoint release hardening handoff`
+- This document update is the doc-only commit immediately above `7de6855`. Use the current branch `HEAD` when resuming.
 - Remote: `https://github.com/OskarasM/three-dispose-guard`
 - Production project: Vercel team `zoltrack team`, project `three-dispose-guard`
 - Do not overwrite the separate dirty checkout at `C:\Users\om117\projects\three-dispose-guard`. Sync it only after the remote branch is merged, preserving its local changes.
 
 Use explicit paths when staging. Do not use `git add .` or `git add -A`.
+
+## Start here
+
+```powershell
+Set-Location 'C:\Users\om117\Documents\Codex\2026-08-21\files-mentioned-by-the-user-build\three-dispose-guard'
+git status --short
+git log -2 --oneline
+Get-Content NEXT-AGENT-HANDOFF.md
+```
+
+The initial working tree should be empty. The parent of the document-only `HEAD` commit should be `7de6855`. If either condition is false, inspect the differences before editing.
+
 
 ## Checkpoint state
 
@@ -21,7 +35,7 @@ The branch is a working development checkpoint, not a release candidate.
 Verified immediately before this handoff:
 
 - `npm run typecheck`: passed.
-- Focused Vitest suite: 37 of 37 passed across registry, resource collection, R3F and research-data tests.
+- Complete Vitest suite: 39 of 39 passed across registry, resource collection, React, R3F and research-data tests.
 - `npm run build`: passed for ESM, CommonJS and declarations.
 - `npm run demo:build`: passed.
 - `git diff --check`: passed, apart from harmless Windows line-ending notices.
@@ -35,8 +49,10 @@ Existing reviewable commits on this branch:
 - `64c8a25 fix: harden guarded loader generations`
 - `d80098e feat: make research captures reproducible`
 - `09581e5 fix: keep unowned cache eviction inert`
+- `c06c8bb fix: close disposal lifecycle edge cases`
+- `7de6855 chore: checkpoint release hardening handoff`
 
-The checkpoint commit after this document also contains:
+`7de6855` contains:
 
 - cache protection reclaiming a microtask-pending resource;
 - deeply frozen diagnostic scope records;
@@ -95,11 +111,16 @@ The checkpoint commit after this document also contains:
 
    Run `npm run check`, `npm run test:browser:all`, `npm run package:check`, `npm run benchmark:verify`, the React 18/R3F 8 compatibility set, `npm audit`, and `npm pack --dry-run --json`. Apply the React best-practices review after the final TSX edits.
 
+9. Close the capture-server failure path.
+
+   In `scripts/capture-benchmark.mjs`, the Vite server starts before `chromium.launch()`, but the current `try/finally` begins after launch. Move browser launch inside the protected block so a launch failure always closes the server.
+
 ## Publication state and external gates
 
 - GitHub repository is public under `OskarasM`.
 - The npm name `three-dispose-guard` returned 404 at the last check, which means it was not currently published. Recheck immediately before release.
 - npm is not authenticated in this environment and the GitHub repository has no `NPM_TOKEN` secret.
+- The completion branch and `7de6855` were local-only at this handoff. They will not appear on GitHub until the branch is explicitly pushed.
 - The GitHub `npm` environment does not yet exist.
 - The Vercel project exists and the current production URL responds, but it contains an older build.
 
