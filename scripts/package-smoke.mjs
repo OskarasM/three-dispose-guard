@@ -18,6 +18,16 @@ function runNpm(args, options = {}) {
   return run(nodeCommand, [npmCli, ...args], options)
 }
 
+// npm 11 reports `pack --json` as an array; npm 12 reports it as an object
+// keyed by package name. Accept either so this script does not pin an npm
+// version the release workflow does not control (it always installs latest
+// for provenance and trusted-publishing support).
+function packManifest(json) {
+  const manifest = Array.isArray(json) ? json[0] : Object.values(json)[0]
+  assert.ok(manifest?.files, 'npm pack did not report a package manifest.')
+  return manifest
+}
+
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: root,
@@ -125,8 +135,8 @@ assert.equal(typeof cjsReact.useResourceLease, 'function')
 assert.equal(typeof esmR3f.createR3FResourceCache, 'function')
 assert.equal(typeof cjsR3f.createR3FResourceCache, 'function')
 
-const dryRun = JSON.parse(runNpm(['pack', '--dry-run', '--json']))
-const packedPaths = new Set(dryRun[0].files.map((file) => file.path))
+const dryRun = packManifest(JSON.parse(runNpm(['pack', '--dry-run', '--json'])))
+const packedPaths = new Set(dryRun.files.map((file) => file.path))
 
 for (const required of ['LICENSE', 'README.md', 'package.json']) {
   assert.ok(packedPaths.has(required), `Packed package is missing ${required}`)
@@ -147,10 +157,10 @@ for (const forbidden of ['src/', 'demo/', 'tests/', 'benchmarks/']) {
 const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), 'three-dispose-guard-consumer-'))
 
 try {
-  const packOutput = JSON.parse(
+  const packOutput = packManifest(JSON.parse(
     runNpm(['pack', '--json', '--pack-destination', temporaryRoot]),
-  )
-  const tarball = path.join(temporaryRoot, packOutput[0].filename)
+  ))
+  const tarball = path.join(temporaryRoot, packOutput.filename)
 
   await writeFile(
     path.join(temporaryRoot, 'package.json'),
