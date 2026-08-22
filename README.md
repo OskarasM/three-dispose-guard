@@ -2,6 +2,8 @@
 
 Ownership-aware GPU resource disposal for Three.js and React Three Fiber.
 
+**[Open the live lab](https://three-dispose-guard.vercel.app)** to run the six proofs in your own browser.
+
 [![CI](https://github.com/OskarasM/three-dispose-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/OskarasM/three-dispose-guard/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/three-dispose-guard)](https://www.npmjs.com/package/three-dispose-guard)
 [![licence](https://img.shields.io/badge/licence-MIT-d8ff53)](LICENSE)
@@ -35,12 +37,15 @@ Do not add it to every R3F scene by default. React Three Fiber already attempts 
 npm install three-dispose-guard
 ```
 
-Requirements:
+Three.js is a required peer dependency. React and React Three Fiber are optional peers, needed only if you import the `/react` or `/r3f` entry points.
 
-- Node.js 20 or later for development tooling
-- Three.js `0.163` or later
-- React 18 or 19 for React helpers
-- React Three Fiber 8 or 9 for the R3F adapter
+| Peer | Range | Required |
+|---|---|---|
+| `three` | `>=0.163 <1` | Yes |
+| `react` | `>=18 <20` | Only for `three-dispose-guard/react` and `/r3f` |
+| `@react-three/fiber` | `>=8 <10` | Only for `three-dispose-guard/r3f` |
+
+The package declares `engines.node: >=20`, which matches the Node versions covered by CI.
 
 ## R3F quick start
 
@@ -76,8 +81,11 @@ export function ProductViewer() {
   )
 }
 
-// Your application cache policy decides when this happens.
-cache.evict(GLTFLoader, '/shoe.glb')
+// Eviction is your application's decision, made at a point in its own
+// lifecycle. Do not run it at module load, as this example previously implied.
+export function releaseProductAssets() {
+  cache.evict(GLTFLoader, '/shoe.glb')
+}
 ```
 
 Start in audit mode and inspect `registry.snapshot().events`. Switch to `{ mode: 'dispose' }` only after the recorded ownership matches the application.
@@ -144,8 +152,9 @@ The signal is `renderer.info.memory.geometries + renderer.info.memory.textures`.
 | In-flight eviction | Does a late result return to an evicted cache? | No, the stale result was cleaned |
 
 The complete captured data is available as
-[JSON](benchmarks/results/2026-08-21-windows-chromium.json) and
-[CSV](benchmarks/results/2026-08-21-windows-chromium.csv).
+[JSON](https://github.com/OskarasM/three-dispose-guard/blob/main/benchmarks/results/2026-08-21-windows-chromium.json) and
+[CSV](https://github.com/OskarasM/three-dispose-guard/blob/main/benchmarks/results/2026-08-21-windows-chromium.csv).
+Raw measurement data is not shipped in the npm tarball.
 
 ## Reproduce the study
 
@@ -226,7 +235,7 @@ A render target is treated as the owner of its attachments, so the target and it
 - Active leases and protections, with labels and ownership.
 - Tracked, pending, protected, owned and borrowed resource counts.
 - Exact counts for geometry, material, texture, render target, skeleton and custom resources.
-- Immutable lifecycle events including scheduled, cancelled, disposed, would-dispose and disposal-error outcomes.
+- Immutable lifecycle events: `acquired`, `released`, `protected`, `unprotected`, `disposed`, `would-dispose`, `disposal-scheduled`, `disposal-cancelled` and `dispose-error`.
 
 Disposal exceptions are reported through both diagnostics and the optional `onError` callback. Cleanup then continues for the remaining resources.
 

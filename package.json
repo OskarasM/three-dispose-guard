@@ -1,7 +1,7 @@
 {
   "name": "three-dispose-guard",
   "version": "0.1.0",
-  "description": "Ownership-aware GPU resource disposal for Three.js, with safe diagnostics by default.",
+  "description": "Audit-first ownership and safe disposal for shared, cached and primitive Three.js resources.",
   "type": "module",
   "license": "MIT",
   "author": "Oskaras Margevicius",
@@ -9,7 +9,7 @@
     "type": "git",
     "url": "git+https://github.com/OskarasM/three-dispose-guard.git"
   },
-  "homepage": "https://github.com/OskarasM/three-dispose-guard#readme",
+  "homepage": "https://three-dispose-guard.vercel.app",
   "bugs": {
     "url": "https://github.com/OskarasM/three-dispose-guard/issues"
   },
@@ -20,31 +20,51 @@
     "gpu",
     "dispose",
     "memory",
-    "react-three-fiber"
+    "react-three-fiber",
+    "r3f",
+    "ownership",
+    "resource-lifecycle"
   ],
   "files": [
     "dist",
+    "docs",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./react": {
-      "types": "./dist/react.d.ts",
-      "import": "./dist/react.js",
-      "require": "./dist/react.cjs"
+      "import": {
+        "types": "./dist/react.d.ts",
+        "default": "./dist/react.js"
+      },
+      "require": {
+        "types": "./dist/react.d.cts",
+        "default": "./dist/react.cjs"
+      }
     },
     "./r3f": {
-      "types": "./dist/r3f.d.ts",
-      "import": "./dist/r3f.js",
-      "require": "./dist/r3f.cjs"
+      "import": {
+        "types": "./dist/r3f.d.ts",
+        "default": "./dist/r3f.js"
+      },
+      "require": {
+        "types": "./dist/r3f.d.cts",
+        "default": "./dist/r3f.cjs"
+      }
     },
     "./package.json": "./package.json"
   },
@@ -60,7 +80,8 @@
     "test:browser:smoke": "playwright test --project=firefox --project=webkit --grep @smoke --workers=1",
     "benchmark:capture": "node scripts/capture-benchmark.mjs",
     "package:check": "npm run build && node scripts/package-smoke.mjs",
-    "release:check": "npm run check && npm run test:browser && npm run package:check",
+    "test:browser:all": "npm run test:browser && npm run test:browser:smoke",
+    "release:check": "npm run check && npm run test:browser:all && npm run package:check && npm run benchmark:chart",
     "benchmark:chart": "node scripts/render-benchmark-chart.mjs",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test && npm run build && npm run demo:build"
@@ -79,6 +100,7 @@
     }
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.55.0",
     "@react-three/fiber": "^9.7.0",
     "@react-three/test-renderer": "^9.1.1",
@@ -87,6 +109,7 @@
     "@types/react-dom": "^19.1.7",
     "@types/three": "^0.185.0",
     "@vitejs/plugin-react": "^5.0.2",
+    "esbuild": "^0.28.2",
     "jsdom": "^26.1.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
@@ -98,5 +121,12 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "overrides": {
+    "esbuild": "^0.28.2"
   }
 }

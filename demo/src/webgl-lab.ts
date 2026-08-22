@@ -49,6 +49,8 @@ export interface SharedAssetProof {
   disposedAfterLastRelease: boolean
   disposeEventsAfterFirstRelease: number
   disposeEventsAfterLastRelease: number
+  eagerInvalidatedSharedHandle: boolean
+  unmanagedRetainedAfterFinalUnmount: boolean
 }
 
 const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
@@ -128,7 +130,7 @@ export type BenchmarkVariant = 'unmanaged' | 'naive' | 'native' | 'guarded'
 
 async function runVariant(
   cycles: number,
-  variant: BenchmarkVariant,
+  variant: Exclude<BenchmarkVariant, 'native'>,
   onSample?: (sample: MemorySample) => void,
 ): Promise<{ report: VariantReport; renderer: string }> {
   const canvas = document.createElement('canvas')
@@ -159,7 +161,7 @@ async function runVariant(
     scene.remove(group)
     if (lease) {
       lease.release()
-    } else if (variant === 'naive' || variant === 'native') {
+    } else if (variant === 'naive') {
       for (const resource of collectDisposableResources(group)) resource.dispose()
     }
     renderer.render(scene, camera)
@@ -177,6 +179,132 @@ async function runVariant(
   return { report, renderer: hardware }
 }
 
+function createNativeCycleElement(
+  createElement: typeof import('react').createElement,
+  cycle: number,
+): import('react').ReactElement {
+  const positions = [-1.8, -0.6, 0.6, 1.8]
+
+  return createElement(
+    'group',
+    { key: `cycle-${cycle}` },
+    createElement('ambientLight', { intensity: 1.2 }),
+    createElement('directionalLight', { intensity: 2.4, position: [2, 4, 5] }),
+    ...positions.map((position, index) => {
+      const size = 16
+      const data = new Uint8Array(size * size * 4)
+      for (let pixel = 0; pixel < size * size; pixel += 1) {
+        data[pixel * 4] = seededByte(cycle * 10 + index, pixel)
+        data[pixel * 4 + 1] = seededByte(cycle * 10 + index + 11, pixel)
+        data[pixel * 4 + 2] = seededByte(cycle * 10 + index + 29, pixel)
+        data[pixel * 4 + 3] = 255
+      }
+
+      return createElement(
+        'mesh',
+        {
+          key: `mesh-${cycle}-${index}`,
+          position: [position, index % 2 === 0 ? 0.24 : -0.24, 0],
+          rotation: [cycle * 0.04, index * 0.45, 0],
+        },
+        createElement(index % 2 === 0 ? 'boxGeometry' : 'sphereGeometry', {
+          args: index % 2 === 0
+            ? [0.62, 0.62, 0.62, 6, 6, 6]
+            : [0.42, 18, 12],
+        }),
+        createElement(
+          'meshStandardMaterial',
+          {
+            roughness: 0.34,
+            metalness: 0.18,
+            color: new Color().setHSL(((cycle + index) % 20) / 20, 0.72, 0.58).getHex(),
+          },
+          createElement('dataTexture', {
+            attach: 'map',
+            args: [data, size, size, RGBAFormat],
+            needsUpdate: true,
+          }),
+        ),
+      )
+    }),
+  )
+}
+
+async function runNativeR3FVariant(
+  cycles: number,
+  onSample?: (sample: MemorySample) => void,
+): Promise<{ report: VariantReport; renderer: string }> {
+  const [{ createElement }, { createRoot, flushSync }] = await Promise.all([
+    import('react'),
+    import('@react-three/fiber'),
+  ])
+  const canvas = document.createElement('canvas')
+  canvas.width = 192
+  canvas.height = 128
+  const renderer = new WebGLRenderer({ canvas, antialias: false, powerPreference: 'low-power' })
+  renderer.setSize(192, 128, false)
+  const hardware = rendererName(renderer)
+  const samples: MemorySample[] = []
+  const root = createRoot(canvas)
+  let store: ReturnType<typeof root.render> | undefined
+  const actEnvironment = globalThis as typeof globalThis & {
+    IS_REACT_ACT_ENVIRONMENT?: boolean
+  }
+  const previousActEnvironment = Object.getOwnPropertyDescriptor(
+    actEnvironment,
+    'IS_REACT_ACT_ENVIRONMENT',
+  )
+
+  await root.configure({
+    gl: renderer,
+    frameloop: 'never',
+    dpr: 1,
+    size: { width: 192, height: 128, top: 0, left: 0 },
+    camera: { fov: 45, position: [0, 0, 6] },
+  })
+
+  Object.defineProperty(actEnvironment, 'IS_REACT_ACT_ENVIRONMENT', {
+    configurable: true,
+    value: true,
+  })
+
+  try {
+    for (let cycle = 1; cycle <= cycles; cycle += 1) {
+      flushSync(() => {
+        store = root.render(createNativeCycleElement(createElement, cycle))
+      })
+      if (!store) throw new Error('R3F did not return a renderer store')
+      const state = store.getState()
+      state.gl.render(state.scene, state.camera)
+
+      flushSync(() => root.render(null))
+      state.gl.render(state.scene, state.camera)
+
+      const sample = readSample(renderer, cycle)
+      samples.push(sample)
+      onSample?.(sample)
+      if (cycle % 4 === 0) await nextFrame()
+    }
+  } finally {
+    root.unmount()
+    await new Promise((resolve) => setTimeout(resolve, 520))
+    if (previousActEnvironment) {
+      Object.defineProperty(
+        actEnvironment,
+        'IS_REACT_ACT_ENVIRONMENT',
+        previousActEnvironment,
+      )
+    } else {
+      delete actEnvironment.IS_REACT_ACT_ENVIRONMENT
+    }
+  }
+
+  const final = samples.at(-1) ?? readSample(renderer, 0)
+  return {
+    report: { samples, final, peak: peakSample(samples) },
+    renderer: hardware,
+  }
+}
 export async function runBenchmark(
   cycles = 50,
   callbacks?: {
@@ -189,7 +317,7 @@ export async function runBenchmark(
   const boundedCycles = Math.min(100, Math.max(1, Math.round(cycles)))
   const unmanaged = await runVariant(boundedCycles, 'unmanaged', callbacks?.onUnmanagedSample)
   const naive = await runVariant(boundedCycles, 'naive', callbacks?.onNaiveSample)
-  const native = await runVariant(boundedCycles, 'native', callbacks?.onNativeSample)
+  const native = await runNativeR3FVariant(boundedCycles, callbacks?.onNativeSample)
   const guarded = await runVariant(boundedCycles, 'guarded', callbacks?.onGuardedSample)
 
   return {
@@ -204,6 +332,39 @@ export async function runBenchmark(
   }
 }
 
+interface SharedCounterfactualWorld {
+  renderer: WebGLRenderer
+  scene: Scene
+  camera: PerspectiveCamera
+  texture: DataTexture
+  left: Mesh
+  right: Mesh
+}
+
+function createSharedCounterfactualWorld(seed: number): SharedCounterfactualWorld {
+  const canvas = document.createElement('canvas')
+  canvas.width = 96
+  canvas.height = 96
+  const renderer = new WebGLRenderer({ canvas, antialias: false })
+  renderer.setSize(96, 96, false)
+  const scene = new Scene()
+  const camera = new PerspectiveCamera(45, 1, 0.1, 10)
+  camera.position.z = 4
+  const texture = createTexture(seed)
+  const geometry = new BoxGeometry(0.8, 0.8, 0.8)
+  const material = new MeshStandardMaterial({ map: texture })
+  const left = new Mesh(geometry, material)
+  const right = new Mesh(geometry, material)
+  left.position.x = -0.6
+  right.position.x = 0.6
+  scene.add(new AmbientLight(0xffffff, 2), left, right)
+  return { renderer, scene, camera, texture, left, right }
+}
+
+function closeCounterfactualWorld(world: SharedCounterfactualWorld): void {
+  world.renderer.dispose()
+  world.renderer.forceContextLoss()
+}
 export function runSharedAssetProof(): SharedAssetProof {
   const canvas = document.createElement('canvas')
   canvas.width = 96
@@ -243,11 +404,40 @@ export function runSharedAssetProof(): SharedAssetProof {
     renderer.properties.get(texture) as { __webglTexture?: WebGLTexture }
   ).__webglTexture
   const eventsAfterLast = registry.snapshot().events.filter((event) => event.type === 'disposed').length
+  const eager = createSharedCounterfactualWorld(405)
+  eager.renderer.render(eager.scene, eager.camera)
+  const eagerOriginal = (
+    eager.renderer.properties.get(eager.texture) as { __webglTexture?: WebGLTexture }
+  ).__webglTexture
+  eager.scene.remove(eager.left)
+  for (const resource of collectDisposableResources(eager.left)) resource.dispose()
+  const eagerAfterFirst = (
+    eager.renderer.properties.get(eager.texture) as { __webglTexture?: WebGLTexture }
+  ).__webglTexture
+  const eagerInvalidatedSharedHandle = Boolean(eagerOriginal && eagerAfterFirst === undefined)
+  closeCounterfactualWorld(eager)
+
+  const unmanaged = createSharedCounterfactualWorld(406)
+  unmanaged.renderer.render(unmanaged.scene, unmanaged.camera)
+  const unmanagedOriginal = (
+    unmanaged.renderer.properties.get(unmanaged.texture) as { __webglTexture?: WebGLTexture }
+  ).__webglTexture
+  unmanaged.scene.remove(unmanaged.left, unmanaged.right)
+  unmanaged.renderer.render(unmanaged.scene, unmanaged.camera)
+  const unmanagedAfterFinalUnmount = (
+    unmanaged.renderer.properties.get(unmanaged.texture) as { __webglTexture?: WebGLTexture }
+  ).__webglTexture
+  const unmanagedRetainedAfterFinalUnmount = Boolean(
+    unmanagedOriginal && unmanagedAfterFinalUnmount === unmanagedOriginal
+  )
+  closeCounterfactualWorld(unmanaged)
 
   const proof = {
     actualWebGLTextureCreated: Boolean(webGLTexture),
     survivedFirstRelease: Boolean(webGLTexture && handleAfterFirstRelease === webGLTexture),
     disposedAfterLastRelease: handleAfterLastRelease === undefined,
+    eagerInvalidatedSharedHandle,
+    unmanagedRetainedAfterFinalUnmount,
     disposeEventsAfterFirstRelease: eventsAfterFirst,
     disposeEventsAfterLastRelease: eventsAfterLast,
   }

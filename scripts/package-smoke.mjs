@@ -6,6 +6,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { spawnSync } from 'node:child_process'
+import { build as buildWithEsbuild } from 'esbuild'
 
 const root = process.cwd()
 const packageJson = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'))
@@ -44,9 +45,32 @@ assert.equal(
   'The package must have zero runtime dependencies.',
 )
 
-const exportFiles = Object.values(packageJson.exports)
-  .flatMap((entry) => (typeof entry === 'string' ? [entry] : Object.values(entry)))
-  .filter((file) => file.startsWith('./dist/'))
+function exportTargets(entry) {
+  if (typeof entry === 'string') {
+    return [entry]
+  }
+
+  return Object.values(entry).flatMap(exportTargets)
+}
+
+const exportFiles = exportTargets(packageJson.exports).filter((file) => file.startsWith('./dist/'))
+
+for (const [subpath, entry] of Object.entries(packageJson.exports)) {
+  if (subpath === './package.json') {
+    continue
+  }
+
+  assert.match(
+    entry.import.types,
+    /\.d\.ts$/,
+    `The import condition for ${subpath} must declare .d.ts types.`,
+  )
+  assert.match(
+    entry.require.types,
+    /\.d\.cts$/,
+    `The require condition for ${subpath} must declare .d.cts types.`,
+  )
+}
 
 for (const file of exportFiles) {
   assert.ok(existsSync(path.join(root, file)), `Missing package export: ${file}`)
@@ -59,6 +83,31 @@ const coreBundles = [
 
 for (const bundle of coreBundles) {
   assert.doesNotMatch(bundle, /@react-three\/fiber|from\s*["']react["']|require\(["']react["']\)/)
+}
+
+const treeShakeResult = await buildWithEsbuild({
+  stdin: {
+    contents: "import { createResourceRegistry } from './dist/index.js'; console.log(createResourceRegistry)",
+    resolveDir: root,
+    sourcefile: 'consumer.mjs',
+  },
+  bundle: true,
+  format: 'esm',
+  metafile: true,
+  minify: true,
+  platform: 'browser',
+  treeShaking: true,
+  write: false,
+})
+
+const treeShakenBundle = treeShakeResult.outputFiles[0]?.text ?? ''
+assert.ok(treeShakenBundle.length > 0, 'Tree-shaken core consumer bundle was empty.')
+assert.doesNotMatch(treeShakenBundle, /@react-three\/fiber|react-dom|GuardedPrimitive/)
+for (const input of Object.keys(treeShakeResult.metafile.inputs)) {
+  assert.doesNotMatch(
+    input.replaceAll('\\', '/'),
+    /node_modules\/(?:react|react-dom|@react-three\/fiber|three)\//,
+  )
 }
 
 const esmCore = await import(pathToFileURL(path.join(root, 'dist/index.js')).href)
@@ -120,18 +169,38 @@ try {
     )
   }
 
+
+  const consumerRequire = createRequire(path.join(temporaryRoot, 'package.json'))
+  for (const specifier of [
+    'three-dispose-guard',
+    'three-dispose-guard/react',
+    'three-dispose-guard/r3f',
+    'three-dispose-guard/package.json',
+  ]) {
+    assert.doesNotThrow(() => consumerRequire.resolve(specifier), `Unresolvable export: ${specifier}`)
+  }
+
   run(nodeCommand, ['--input-type=module', '-e', "import('three-dispose-guard').then(m => { if (typeof m.createResourceRegistry !== 'function') process.exit(1) })"], { cwd: temporaryRoot })
   run(nodeCommand, ['-e', "const m = require('three-dispose-guard'); if (typeof m.createResourceRegistry !== 'function') process.exit(1)"], { cwd: temporaryRoot })
 
-  const consumer = path.join(temporaryRoot, 'consumer.ts')
+  const esmConsumer = path.join(temporaryRoot, 'consumer.mts')
   await writeFile(
-    consumer,
+    esmConsumer,
     "import { createResourceRegistry } from 'three-dispose-guard'\ncreateResourceRegistry({ mode: 'audit' })\n",
   )
+
+  const cjsConsumer = path.join(temporaryRoot, 'consumer.cts')
+  await writeFile(
+    cjsConsumer,
+    "import { createResourceRegistry } from 'three-dispose-guard'\nimport type { RegistrySnapshot } from 'three-dispose-guard'\nconst snapshot: RegistrySnapshot = createResourceRegistry({ mode: 'audit' }).snapshot()\nconsole.log(snapshot.trackedResources)\n",
+  )
+
   const tsc = path.join(root, 'node_modules', 'typescript', 'bin', 'tsc')
-  run(nodeCommand, [tsc, consumer, '--noEmit', '--strict', '--skipLibCheck', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--target', 'ES2022'], { cwd: temporaryRoot })
+  for (const consumer of [esmConsumer, cjsConsumer]) {
+    run(nodeCommand, [tsc, consumer, '--noEmit', '--strict', '--skipLibCheck', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--target', 'ES2022'], { cwd: temporaryRoot })
+  }
 } finally {
   await rm(temporaryRoot, { recursive: true, force: true })
 }
 
-console.log(`Package smoke passed with ${packedPaths.size} files and a React-free consumer install.`)
+console.log(`Package smoke passed with ${packedPaths.size} files and a React-free ESM and CommonJS consumer install.`)

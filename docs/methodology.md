@@ -25,12 +25,14 @@ Shared-resource proofs also inspect the underlying `WebGLTexture` through the te
 - Assets are generated locally with deterministic seeds.
 - The measured viewport is 192 by 128 pixels for allocation runs.
 - Antialiasing is disabled in measured renderers.
-- One four-cycle warm-up is completed and discarded.
-- Five independent runs are captured.
-- Each run contains 50 mount and unmount cycles per strategy.
-- Strategies execute sequentially in the same browser session.
-- Final totals, minimum, maximum, mean and population variance are recorded.
-- Every raw per-cycle sample is retained in JSON and CSV.
+- Every one of the six scenarios receives one four-cycle warm-up, which is discarded.
+- Five repeated runs are captured. They are repeated observations, not statistically independent samples.
+- Every recorded scenario run uses 50 lifecycle cycles or transitions.
+- Scenarios and strategies execute in a fixed, documented order within one browser process.
+- Final totals, minimum, maximum, mean and population variance are recorded for the unique-resource series.
+- Every per-cycle resource sample, assertion, comparison outcome and scenario summary is retained in JSON and CSV.
+
+Schema v2 records the exact package versions from `package-lock.json`, Git commit, dirty-worktree state, lockfile SHA-256, timezone, operating system, CPU, browser version and WebGL renderer. Filenames include a millisecond timestamp, platform, browser and commit prefix; an incrementing suffix prevents same-name overwrites.
 
 ## Four comparison strategies
 
@@ -42,11 +44,11 @@ A unique geometry, material and texture set is created and rendered each cycle. 
 
 Every collected resource is disposed immediately after its object unmounts. This is valid for unique resources but unsafe for a resource still used elsewhere.
 
-### Declarative-style disposal
+### Native R3F disposal
 
-The unique-resource experiment models cleanup at declarative unmount. It is expected to match eager cleanup and the guard because ownership is unambiguous.
+The unique-resource experiment uses the public R3F `createRoot` reconciler with declarative geometry, material and texture elements. Each tree is committed and then unmounted. R3F's testing flag makes its idle cleanup run immediately; this changes scheduling, not which declarative objects R3F owns.
 
-This line is not presented as a full R3F renderer benchmark. Real R3F `useLoader`, mounted-consumer and cache-clear behaviour is exercised by the adapter integration tests and specialised browser proofs.
+Native R3F is marked `not-applicable` or `not-measured` where there is no honest equivalent. In particular, R3F cannot infer an external owner for an arbitrary shared primitive, and its loader cache does not expose a general owned-resource cleanup contract for a late result. Those cells are never silently replaced by a modelled line.
 
 ### Dispose Guard
 
@@ -54,41 +56,29 @@ Each unique root is acquired as owned and released after unmount. The registry c
 
 ## Six scenarios
 
-1. **Unique resources** records all four resource-count series.
-2. **Two live users** verifies that a real WebGL texture survives the first release and disappears after the second.
-3. **Loader cache reuse** verifies survival at zero mounted users, handle reuse after remount and final disposal after eviction.
-4. **Canvas remount** separates scene-resource disposal from renderer and context cleanup.
-5. **Shared churn** alternates consumers around one protected resource for a fixed cycle count.
-6. **In-flight eviction** uses an actual R3F preload with a deterministic late loader callback.
+1. **Unique resources** records unmanaged, eager, actual native-R3F and guarded resource-count series.
+2. **Two live users** measures three real WebGL counterfactuals: unmanaged retention, eager invalidation and guarded final-owner cleanup. Native R3F is not applicable to an externally owned shared primitive.
+3. **Loader cache reuse** verifies survival at zero mounted users, handle reuse after remount and final disposal after eviction. Unmeasured counterfactuals are labelled as such.
+4. **Canvas remount** separates scene-resource disposal from renderer and context cleanup rather than treating them as one memory number.
+5. **Shared churn** alternates consumers around one protected resource for the full cycle count.
+6. **In-flight eviction** repeats an actual R3F preload with a deterministic late loader callback and unique cache key.
 
-Each proof publishes individual pass or fail assertions rather than reducing different lifecycle questions to one memory graph.
+Each report publishes assertions and a four-variant applicability table. A variant can be `safe`, `unsafe`, `retained`, `not-measured` or `not-applicable`. Only rows with `measured: true` are empirical results.
 
-## Reference environment
+## Historical schema-v1 reference
 
-Captured on 21 August 2026:
-
-- Windows_NT 10.0.26200 x64
-- AMD Ryzen 7 5800H with Radeon Graphics
-- 16 logical processors and 15.34 GiB reported system memory
-- Chromium 151.0.7922.34, headless
-- ANGLE with Vulkan SwiftShader
-- Three.js 0.185.x
-- React 19.x
-- React Three Fiber 9.7.x
-- three-dispose-guard 0.1.0
-
-The software renderer makes this suitable for deterministic lifecycle evidence, not for performance conclusions about a physical GPU.
-
-## Reference result
+The files dated 21 August 2026 were captured before schema v2 and are retained unchanged as historical evidence. Their environment was Windows_NT 10.0.26200 x64, Chromium 151.0.7922.34 and ANGLE SwiftShader.
 
 | Strategy | Five final totals | Mean | Variance |
 |---|---:|---:|---:|
 | Unmanaged | 401, 401, 401, 401, 401 | 401 | 0 |
 | Naïve eager | 1, 1, 1, 1, 1 | 1 | 0 |
-| Declarative-style | 1, 1, 1, 1, 1 | 1 | 0 |
+| Declarative-style model | 1, 1, 1, 1, 1 | 1 | 0 |
 | Dispose Guard | 1, 1, 1, 1, 1 | 1 | 0 |
 
-All five specialised proofs passed.
+That dataset does not contain the actual-R3F line, repeated specialised scenarios, exact patch versions or full CSV provenance. It must not be relabelled as a schema-v2 result. A fresh capture is required before replacing the public chart or making new numerical claims.
+
+The software renderer is suitable for deterministic lifecycle evidence, not performance conclusions about a physical GPU.
 
 ## Reproduction
 
@@ -99,15 +89,23 @@ npm run benchmark:capture
 npm run benchmark:chart
 ```
 
-The capture script adds the host operating system, CPU, logical processor count, reported memory, browser version and renderer string to the output.
+The capture validates all six scenarios before writing. It refuses approximate package versions or a missing scenario run. Both the JSON shape and the typed CSV records are documented in [the benchmark guide](../benchmarks/README.md).
 
-A result from different hardware or a different browser should be committed under a new dated filename. Do not merge distinct environments into the reference capture without retaining their raw samples.
+A dirty-worktree capture is allowed for development but is marked `git_worktree_dirty=true`. A public reference should be generated from a clean commit. Different hardware, browsers or dependency sets produce separate collision-safe files and are never merged into one result.
+
+The benchmark data is licensed separately under [CC BY 4.0](../DATA-LICENSE.md).
 
 ## Threats to validity
 
 - `renderer.info` may contain stable internal resources not created by the scenario.
-- Browser and driver versions can change allocation behaviour.
-- Headless SwiftShader does not represent physical-GPU performance.
+- Counts are lifecycle signals, not GPU bytes, JavaScript heap values, timings or driver-memory measurements.
+- The five runs share one browser process, fixed order and deterministic inputs. Population variance describes repeatability under that protocol, not a population estimate or confidence interval.
+- Fixed strategy and scenario order can introduce order effects. The order is recorded rather than randomised.
+- Headless SwiftShader does not represent physical-GPU performance or vendor-driver behaviour.
+- Chromium carries the WebGL assertions. Firefox and WebKit smoke checks do not establish equivalent allocation behaviour.
 - Forced context loss is a lifecycle assertion, not a memory-pressure measurement.
-- The declarative-style line isolates disposal timing and does not reproduce every R3F reconciler detail.
-- Private WebGL-handle inspection can change between Three.js releases and is therefore confined to tests.
+- The actual-R3F unique test uses immediate test-environment disposal scheduling. Production R3F may schedule the same cleanup later.
+- Specialised native-R3F counterfactuals are omitted when no equivalent ownership contract exists; `not-measured` is not evidence of success or failure.
+- Private `WebGLTexture` inspection can change between Three.js releases and is confined to the harness.
+- Exact versions, commit identity and lockfile hash improve reproducibility but do not prove that another machine will produce identical renderer counts.
+- The study has no external replication yet. A physical-GPU capture and an independent environment remain valuable follow-up work.

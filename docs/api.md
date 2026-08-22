@@ -118,7 +118,7 @@ Import from `three-dispose-guard/r3f`. It requires React and `@react-three/fiber
 
 ### `createR3FResourceCache({ registry })`
 
-Returns one coordinator for one R3F loader-cache ownership domain.
+Returns one coordinator for one R3F loader-cache ownership domain. Loader arguments may be constructors or stable loader instances.
 
 Methods:
 
@@ -128,11 +128,13 @@ Methods:
 - `snapshot()`
 - `subscribe(listener)`
 
-A loader/input pair cannot be claimed by two different guards because R3F's underlying loader cache is global for that key.
+A loader/input pair cannot be claimed by two different guards because R3F's underlying loader cache is global for that key. The guard reuses one stable loader representation for loading, preloading and clearing.
 
 ### `useGuardedLoader(loader, input, extensions?, onProgress?)`
 
-Mirrors the R3F `useLoader` signature and return type. It registers a cache entry before suspension, protects resolved results and acquires a borrowed component lease after commit.
+Mirrors the R3F `useLoader` signature and return type, including string-array inputs, loader extensions and progress callbacks. It registers a cache entry before suspension, protects resolved results and acquires a borrowed component lease after commit.
+
+Each request is associated with its exact key and generation. Rejections propagate the original error, create no protection and remain retryable. If one part of an array request rejects, any sibling that resolves later belongs to that failed generation and is cleaned rather than cached.
 
 ### `GuardedPrimitive`
 

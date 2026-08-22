@@ -18,71 +18,35 @@ import {
   type BenchmarkVariant,
   type MemorySample,
 } from './webgl-lab'
+import { scenarios, type ScenarioId } from './research-model'
+export { scenarios } from './research-model'
+export type { ScenarioDefinition, ScenarioId } from './research-model'
 
-export type ScenarioId =
-  | 'unique'
-  | 'shared'
-  | 'cache'
-  | 'canvas'
-  | 'churn'
-  | 'in-flight'
+declare const __THREE_DISPOSE_GUARD_PACKAGE_VERSIONS__: Readonly<{
+  three: string
+  react: string
+  r3f: string
+  disposeGuard: string
+}>
 
-export interface ScenarioDefinition {
-  id: ScenarioId
-  index: string
-  title: string
-  question: string
-  description: string
-}
-
-export const scenarios: readonly ScenarioDefinition[] = [
-  {
-    id: 'unique',
-    index: '01',
-    title: 'Unique resources',
-    question: 'What grows when every mount creates new GPU resources?',
-    description: 'Four equal runs compare retained resources with three explicit cleanup strategies.',
-  },
-  {
-    id: 'shared',
-    index: '02',
-    title: 'Two live users',
-    question: 'Does the first unmount break the second user?',
-    description: 'An actual WebGL texture is shared by two meshes and inspected after each release.',
-  },
-  {
-    id: 'cache',
-    index: '03',
-    title: 'Loader cache reuse',
-    question: 'Can zero mounted users still be a valid owner state?',
-    description: 'A cache protection keeps a reusable result alive until explicit eviction.',
-  },
-  {
-    id: 'canvas',
-    index: '04',
-    title: 'Canvas remount',
-    question: 'Which cleanup belongs to the scene, and which belongs to the renderer?',
-    description: 'Scene resources and WebGL contexts are measured as separate lifecycles.',
-  },
-  {
-    id: 'churn',
-    index: '05',
-    title: 'Shared churn',
-    question: 'Does repeated hand-off change the final disposal count?',
-    description: 'Two consumers alternate around one protected asset for a fixed number of cycles.',
-  },
-  {
-    id: 'in-flight',
-    index: '06',
-    title: 'In-flight eviction',
-    question: 'What happens when an evicted load resolves late?',
-    description: 'A real R3F preload is evicted before its deterministic loader callback resolves.',
-  },
-]
 
 export interface ProofAssertion {
   label: string
   passed: boolean
+  detail: string
+}
+
+export type ComparisonOutcome =
+  | 'safe'
+  | 'unsafe'
+  | 'retained'
+  | 'not-measured'
+  | 'not-applicable'
+
+export interface VariantComparison {
+  variant: BenchmarkVariant
+  outcome: ComparisonOutcome
+  measured: boolean
   detail: string
 }
 
@@ -95,18 +59,38 @@ export interface ScenarioReport {
   browser: string
   series: Partial<Record<BenchmarkVariant, MemorySample[]>>
   assertions: ProofAssertion[]
+  comparisons: readonly VariantComparison[]
   notes: readonly string[]
   benchmark?: BenchmarkReport
 }
 
+export interface ScenarioExecution {
+  run: number
+  report: ScenarioReport
+}
+
+export interface ScenarioSummary {
+  executions: number
+  assertions: number
+  passedAssertions: number
+  failedAssertions: number
+  passRate: number
+}
+
 export interface ResearchSuite {
-  schemaVersion: 1
+  schemaVersion: 2
+  artifactKind: 'browser-suite'
   measuredAt: string
   runs: number
   cyclesPerRun: number
   warmupCycles: number
   renderer: string
   browser: string
+  protocol: {
+    scenarioOrder: readonly ScenarioId[]
+    executionOrder: 'fixed'
+    nativeUniqueImplementation: 'r3f-create-root'
+  }
   packageVersions: {
     three: string
     react: string
@@ -121,6 +105,8 @@ export interface ResearchSuite {
     mean: number
     variance: number
   }>
+  scenarioRuns: ScenarioExecution[]
+  scenarioSummary: Record<ScenarioId, ScenarioSummary>
   proofs: ScenarioReport[]
 }
 
@@ -187,6 +173,7 @@ function proofReport(
   renderer: string,
   assertions: ProofAssertion[],
   notes: readonly string[],
+  comparisons: readonly VariantComparison[] = [],
 ): ScenarioReport {
   return {
     scenario,
@@ -198,6 +185,7 @@ function proofReport(
     series: {},
     assertions,
     notes,
+    comparisons,
   }
 }
 
@@ -269,7 +257,7 @@ export function runCacheReuseProof(): ScenarioReport {
 }
 
 export function runCanvasRemountProof(remounts = 3): ScenarioReport {
-  const bounded = Math.min(10, Math.max(1, Math.round(remounts)))
+  const bounded = Math.min(100, Math.max(1, Math.round(remounts)))
   let disposedResources = 0
   let lostContexts = 0
   let hardware = 'not measured'
@@ -363,6 +351,8 @@ export function runSharedChurnProof(cycles = 50): ScenarioReport {
   return report
 }
 
+let inFlightSequence = 0
+
 class DeferredProofLoader extends Loader<Scene, string> {
   static active: DeferredProofLoader | undefined
   resolve: (() => void) | undefined
@@ -378,7 +368,7 @@ export async function runInFlightProof(): Promise<ScenarioReport> {
   const { createR3FResourceCache } = await import('three-dispose-guard/r3f')
   const registry = createResourceRegistry({ mode: 'dispose' })
   const cache = createR3FResourceCache({ registry })
-  const url = `lab://in-flight-${Date.now()}`
+  const url = `lab://in-flight-${++inFlightSequence}`
 
   cache.preload(DeferredProofLoader, url)
   const loader = DeferredProofLoader.active
@@ -414,6 +404,53 @@ export async function runInFlightProof(): Promise<ScenarioReport> {
 
 const variants: readonly BenchmarkVariant[] = ['unmanaged', 'naive', 'native', 'guarded']
 
+function aggregateScenarioReports(
+  scenario: ScenarioId,
+  cycles: number,
+  reports: ScenarioReport[],
+): ScenarioReport {
+  const definition = scenarios.find((item) => item.id === scenario)
+  const labels = [...new Set(reports.flatMap((report) =>
+    report.assertions.map((assertion) => assertion.label),
+  ))]
+  const assertions = labels.map((label): ProofAssertion => {
+    const observations = reports.flatMap((report) =>
+      report.assertions.filter((assertion) => assertion.label === label),
+    )
+    const passed = observations.filter((assertion) => assertion.passed).length
+    return {
+      label,
+      passed: passed === observations.length,
+      detail: `${passed}/${observations.length} repetitions passed. ${observations.at(-1)?.detail ?? ''}`.trim(),
+    }
+  })
+  const comparisons = variants.flatMap((variant): VariantComparison[] => {
+    const observations = reports.flatMap((report) =>
+      report.comparisons.filter((comparison) => comparison.variant === variant),
+    )
+    if (observations.length === 0) return []
+    const outcomes = [...new Set(observations.map((comparison) => comparison.outcome))]
+    return [{
+      variant,
+      outcome: outcomes.length === 1 ? outcomes[0] : 'not-measured',
+      measured: observations.every((comparison) => comparison.measured),
+      detail: `${observations.length} repetitions: ${outcomes.join(', ')}. ${observations.at(-1)?.detail ?? ''}`.trim(),
+    }]
+  })
+
+  return {
+    scenario,
+    title: definition?.title ?? scenario,
+    measuredAt: new Date().toISOString(),
+    cycles,
+    renderer: reports[0]?.renderer ?? 'not measured',
+    browser: navigator.userAgent,
+    series: {},
+    assertions,
+    comparisons,
+    notes: [...new Set(reports.flatMap((report) => report.notes))],
+  }
+}
 export async function runScenario(
   scenario: ScenarioId,
   cycles = 50,
@@ -457,8 +494,34 @@ export async function runScenario(
           detail: 'Unique assets do not require reference counting when ownership is already clear.',
         },
       ],
+      comparisons: [
+        {
+          variant: 'unmanaged',
+          outcome: 'retained',
+          measured: true,
+          detail: 'Resources remained registered after each unmount because no disposal ran.',
+        },
+        {
+          variant: 'naive',
+          outcome: 'safe',
+          measured: true,
+          detail: 'Eager cleanup is valid while every resource has exactly one owner.',
+        },
+        {
+          variant: 'native',
+          outcome: 'safe',
+          measured: true,
+          detail: 'Actual R3F createRoot reconciliation disposed declarative geometry, material and texture elements.',
+        },
+        {
+          variant: 'guarded',
+          outcome: 'safe',
+          measured: true,
+          detail: 'The final owned lease release disposed the unique resource graph.',
+        },
+      ],
       notes: [
-        'The native line models declarative disposal on unmount and is expected to succeed here.',
+        'The native line uses actual R3F createRoot reconciliation; the test flag changes cleanup scheduling only.',
         'The unmanaged line intentionally omits disposal to reproduce the failure before comparing fixes.',
       ],
       benchmark,
@@ -466,33 +529,204 @@ export async function runScenario(
   }
 
   if (scenario === 'shared') {
-    const proof = runSharedAssetProof()
-    return proofReport('shared', 2, 'Live WebGL texture handle', [
-      {
-        label: 'Texture reached WebGL',
-        passed: proof.actualWebGLTextureCreated,
-        detail: 'The assertion checks a native WebGLTexture, not only a JavaScript object.',
-      },
-      {
-        label: 'First release preserved sharing',
-        passed: proof.survivedFirstRelease && proof.disposeEventsAfterFirstRelease === 0,
-        detail: `${proof.disposeEventsAfterFirstRelease} disposal events occurred after user one.`,
-      },
-      {
-        label: 'Final release cleaned the resource',
-        passed: proof.disposedAfterLastRelease && proof.disposeEventsAfterLastRelease === 3,
-        detail: `${proof.disposeEventsAfterLastRelease} final disposal events occurred.`,
-      },
-    ], [
-      'Blind eager disposal would invalidate the resource still used by the second mesh.',
-      'Reference counting matters here because both users are genuine owners.',
-    ])
+    const reports: ScenarioReport[] = []
+    for (let cycle = 0; cycle < bounded; cycle += 1) {
+      const proof = runSharedAssetProof()
+      reports.push(proofReport('shared', 1, 'Live WebGL texture handles', [
+        {
+          label: 'Texture reached WebGL',
+          passed: proof.actualWebGLTextureCreated,
+          detail: 'The assertion checks a native WebGLTexture, not only a JavaScript object.',
+        },
+        {
+          label: 'Unmanaged final unmount retained the handle',
+          passed: proof.unmanagedRetainedAfterFinalUnmount,
+          detail: 'The unmanaged counterfactual left the WebGL allocation registered.',
+        },
+        {
+          label: 'Eager first release invalidated sharing',
+          passed: proof.eagerInvalidatedSharedHandle,
+          detail: 'The eager counterfactual removed the shared handle while another user remained.',
+        },
+        {
+          label: 'Guarded first release preserved sharing',
+          passed: proof.survivedFirstRelease && proof.disposeEventsAfterFirstRelease === 0,
+          detail: `${proof.disposeEventsAfterFirstRelease} disposal events occurred after user one.`,
+        },
+        {
+          label: 'Guarded final release cleaned the resource',
+          passed: proof.disposedAfterLastRelease && proof.disposeEventsAfterLastRelease === 3,
+          detail: `${proof.disposeEventsAfterLastRelease} final disposal events occurred.`,
+        },
+      ], [
+        'The unmanaged, eager and guarded paths use real WebGL texture handles.',
+        'A native R3F row is not applicable to arbitrary shared primitives because R3F cannot infer their external owner.',
+      ], [
+        {
+          variant: 'unmanaged',
+          outcome: 'retained',
+          measured: true,
+          detail: 'The texture handle survived after both scene users were removed.',
+        },
+        {
+          variant: 'naive',
+          outcome: 'unsafe',
+          measured: true,
+          detail: 'The first user disposed the allocation still referenced by the second user.',
+        },
+        {
+          variant: 'native',
+          outcome: 'not-applicable',
+          measured: false,
+          detail: 'External shared primitives do not have one unambiguous declarative R3F owner.',
+        },
+        {
+          variant: 'guarded',
+          outcome: 'safe',
+          measured: true,
+          detail: 'The first release preserved the handle and the final release disposed it once.',
+        },
+      ]))
+    }
+    return aggregateScenarioReports('shared', bounded, reports)
   }
 
-  if (scenario === 'cache') return runCacheReuseProof()
-  if (scenario === 'canvas') return runCanvasRemountProof(3)
-  if (scenario === 'churn') return runSharedChurnProof(bounded)
-  return runInFlightProof()
+  if (scenario === 'cache') {
+    const reports = Array.from({ length: bounded }, () => {
+      const report = runCacheReuseProof()
+      return {
+        ...report,
+        comparisons: [
+          {
+            variant: 'unmanaged',
+            outcome: 'retained',
+            measured: false,
+            detail: 'Not remeasured here; an unmanaged cache has no deterministic eviction cleanup.',
+          },
+          {
+            variant: 'naive',
+            outcome: 'unsafe',
+            measured: false,
+            detail: 'Not remeasured here; releasing at zero consumers conflicts with the retained cache owner.',
+          },
+          {
+            variant: 'native',
+            outcome: 'not-measured',
+            measured: false,
+            detail: 'Native useLoader cache persistence is documented separately; this proof isolates guard ownership.',
+          },
+          {
+            variant: 'guarded',
+            outcome: 'safe',
+            measured: true,
+            detail: 'The cache survived zero users, reused its handle and disposed on final eviction.',
+          },
+        ] satisfies VariantComparison[],
+      }
+    })
+    return aggregateScenarioReports('cache', bounded, reports)
+  }
+
+  if (scenario === 'canvas') {
+    const report = runCanvasRemountProof(bounded)
+    return {
+      ...report,
+      comparisons: [
+        {
+          variant: 'unmanaged',
+          outcome: 'not-measured',
+          measured: false,
+          detail: 'No unmanaged counterfactual was run; this proof isolates owned scene cleanup from renderer teardown.',
+        },
+        {
+          variant: 'naive',
+          outcome: 'not-measured',
+          measured: false,
+          detail: 'No eager-disposal counterfactual was run because this scenario does not share resources between owners.',
+        },
+        {
+          variant: 'native',
+          outcome: 'not-measured',
+          measured: false,
+          detail: 'This proof separates scene ownership from renderer teardown rather than ranking Canvas implementations.',
+        },
+        {
+          variant: 'guarded',
+          outcome: 'safe',
+          measured: true,
+          detail: 'Owned scene resources and renderer contexts completed their separate lifecycles.',
+        },
+      ],
+    }
+  }
+
+  if (scenario === 'churn') {
+    const report = runSharedChurnProof(bounded)
+    return {
+      ...report,
+      comparisons: [
+        {
+          variant: 'unmanaged',
+          outcome: 'not-measured',
+          measured: false,
+          detail: 'Unmanaged retention was demonstrated in the shared-resource scenario and was not remeasured during churn.',
+        },
+        {
+          variant: 'naive',
+          outcome: 'unsafe',
+          measured: false,
+          detail: 'A release without the overlapping next owner would invalidate the shared allocation.',
+        },
+        {
+          variant: 'native',
+          outcome: 'not-applicable',
+          measured: false,
+          detail: 'R3F cannot infer the external lifetime of one primitive shared across an application-managed pool.',
+        },
+        {
+          variant: 'guarded',
+          outcome: 'safe',
+          measured: true,
+          detail: 'The handle survived every hand-off and final disposal remained singular.',
+        },
+      ],
+    }
+  }
+
+  const reports: ScenarioReport[] = []
+  for (let cycle = 0; cycle < bounded; cycle += 1) {
+    const report = await runInFlightProof()
+    reports.push({
+      ...report,
+      comparisons: [
+        {
+          variant: 'unmanaged',
+          outcome: 'not-measured',
+          measured: false,
+          detail: 'An unmanaged late-result counterfactual was not run, so retention is not claimed by this report.',
+        },
+        {
+          variant: 'naive',
+          outcome: 'not-measured',
+          measured: false,
+          detail: 'An eager callback-cleanup counterfactual was not run because loaders do not expose one portable cancellation lifecycle.',
+        },
+        {
+          variant: 'native',
+          outcome: 'not-measured',
+          measured: false,
+          detail: 'The native cache does not expose a portable owned-resource cleanup contract for late results.',
+        },
+        {
+          variant: 'guarded',
+          outcome: 'safe',
+          measured: true,
+          detail: 'The stale generation stayed evicted and its disposable resource graph was cleaned.',
+        },
+      ],
+    })
+  }
+  return aggregateScenarioReports('in-flight', bounded, reports)
 }
 
 function finalTotal(report: BenchmarkReport, variant: BenchmarkVariant): number {
@@ -518,6 +752,24 @@ function summarise(benchmarks: BenchmarkReport[]): ResearchSuite['summary'] {
   })) as ResearchSuite['summary']
 }
 
+function summariseScenarioExecutions(
+  executions: ScenarioExecution[],
+): Record<ScenarioId, ScenarioSummary> {
+  return Object.fromEntries(scenarios.map(({ id }) => {
+    const reports = executions
+      .filter((execution) => execution.report.scenario === id)
+      .map((execution) => execution.report)
+    const assertions = reports.flatMap((report) => report.assertions)
+    const passedAssertions = assertions.filter((assertion) => assertion.passed).length
+    return [id, {
+      executions: reports.length,
+      assertions: assertions.length,
+      passedAssertions,
+      failedAssertions: assertions.length - passedAssertions,
+      passRate: assertions.length === 0 ? 0 : passedAssertions / assertions.length,
+    }]
+  })) as Record<ScenarioId, ScenarioSummary>
+}
 export async function runResearchSuite(
   runs = 5,
   cyclesPerRun = 50,
@@ -526,69 +778,254 @@ export async function runResearchSuite(
   const boundedCycles = Math.min(100, Math.max(1, Math.round(cyclesPerRun)))
   const warmupCycles = 4
 
-  await runBenchmark(warmupCycles)
-  const benchmarks: BenchmarkReport[] = []
-  for (let run = 0; run < boundedRuns; run += 1) {
-    benchmarks.push(await runBenchmark(boundedCycles))
+  const scenarioOrder = scenarios.map(({ id }) => id)
+  for (const scenario of scenarioOrder) {
+    await runScenario(scenario, warmupCycles)
   }
 
-  const proofs = [
-    await runScenario('shared', 2),
-    await runScenario('cache', 3),
-    await runScenario('canvas', 3),
-    await runScenario('churn', boundedCycles),
-    await runScenario('in-flight', 1),
-  ]
+  const benchmarks: BenchmarkReport[] = []
+  const scenarioRuns: ScenarioExecution[] = []
+  for (let run = 1; run <= boundedRuns; run += 1) {
+    for (const scenario of scenarioOrder) {
+      const report = await runScenario(scenario, boundedCycles)
+      scenarioRuns.push({ run, report })
+      if (scenario === 'unique' && report.benchmark) benchmarks.push(report.benchmark)
+    }
+  }
+
+  const finalRun = scenarioRuns
+    .filter((execution) => execution.run === boundedRuns)
+    .map((execution) => execution.report)
+  const proofs = finalRun.filter((report) => report.scenario !== 'unique')
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    artifactKind: 'browser-suite',
     measuredAt: new Date().toISOString(),
     runs: boundedRuns,
     cyclesPerRun: boundedCycles,
     warmupCycles,
     renderer: benchmarks[0]?.renderer ?? 'not measured',
     browser: navigator.userAgent,
+    protocol: {
+      scenarioOrder,
+      executionOrder: 'fixed',
+      nativeUniqueImplementation: 'r3f-create-root',
+    },
     packageVersions: {
-      three: '0.185.x',
-      react: '19.x',
-      r3f: '9.7.x',
-      disposeGuard: '0.1.0',
+      ...__THREE_DISPOSE_GUARD_PACKAGE_VERSIONS__,
     },
     benchmarks,
     summary: summarise(benchmarks),
+    scenarioRuns,
+    scenarioSummary: summariseScenarioExecutions(scenarioRuns),
     proofs,
   }
 }
 
 export function researchSuiteToCsv(suite: ResearchSuite): string {
   const header = [
+    'record_type',
     'run',
+    'scenario',
     'variant',
     'cycle',
     'geometries',
     'textures',
     'programs',
+    'assertion',
+    'passed',
+    'outcome',
+    'measured',
+    'detail',
+    'minimum',
+    'maximum',
+    'mean',
+    'variance',
+    'executions',
+    'failed_assertions',
+    'pass_rate',
     'measured_at',
     'renderer',
     'browser',
   ]
-  const rows = suite.benchmarks.flatMap((report, run) =>
-    variants.flatMap((variant) =>
-      report[variant].samples.map((sample) => [
-        run + 1,
-        variant,
-        sample.cycle,
-        sample.geometries,
-        sample.textures,
-        sample.programs,
-        report.measuredAt,
-        report.renderer,
-        report.browser,
-      ]),
-    ),
-  )
-  return [header, ...rows]
-    .map((row) => row.map((value) => JSON.stringify(String(value))).join(','))
+  const rows: Array<Array<string | number | boolean | undefined>> = []
+  const captureWideHeader = [
+    'artifact_kind',
+    'captured_at',
+    'runs',
+    'cycles_per_run',
+    'warmup_cycles',
+    'protocol_scenario_order',
+    'protocol_execution_order',
+    'protocol_native_implementation',
+    'package_three',
+    'package_react',
+    'package_r3f',
+    'package_dispose_guard',
+  ]
+  const captureWideValues = [
+    suite.artifactKind,
+    suite.measuredAt,
+    suite.runs,
+    suite.cyclesPerRun,
+    suite.warmupCycles,
+    suite.protocol.scenarioOrder.join('|'),
+    suite.protocol.executionOrder,
+    suite.protocol.nativeUniqueImplementation,
+    suite.packageVersions.three,
+    suite.packageVersions.react,
+    suite.packageVersions.r3f,
+    suite.packageVersions.disposeGuard,
+  ]
+
+  suite.benchmarks.forEach((report, run) => {
+    for (const variant of variants) {
+      for (const sample of report[variant].samples) {
+        rows.push([
+          'sample',
+          run + 1,
+          'unique',
+          variant,
+          sample.cycle,
+          sample.geometries,
+          sample.textures,
+          sample.programs,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          report.measuredAt,
+          report.renderer,
+          report.browser,
+        ])
+      }
+    }
+  })
+
+  for (const variant of variants) {
+    const summary = suite.summary[variant]
+    rows.push([
+      'variant_summary',
+      undefined,
+      'unique',
+      variant,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      `final totals: ${summary.finalTotals.join('|')}`,
+      summary.minimum,
+      summary.maximum,
+      summary.mean,
+      summary.variance,
+    ])
+  }
+
+  for (const execution of suite.scenarioRuns) {
+    for (const assertion of execution.report.assertions) {
+      rows.push([
+        'assertion',
+        execution.run,
+        execution.report.scenario,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        assertion.label,
+        assertion.passed,
+        undefined,
+        true,
+        assertion.detail,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        execution.report.measuredAt,
+        execution.report.renderer,
+        execution.report.browser,
+      ])
+    }
+    for (const comparison of execution.report.comparisons) {
+      rows.push([
+        'comparison',
+        execution.run,
+        execution.report.scenario,
+        comparison.variant,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        comparison.outcome,
+        comparison.measured,
+        comparison.detail,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        execution.report.measuredAt,
+        execution.report.renderer,
+        execution.report.browser,
+      ])
+    }
+  }
+
+  for (const scenario of scenarios.map(({ id }) => id)) {
+    const summary = suite.scenarioSummary[scenario]
+    rows.push([
+      'scenario_summary',
+      undefined,
+      scenario,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      summary.executions,
+      summary.failedAssertions,
+      summary.passRate,
+    ])
+  }
+
+  return [
+    [...header, ...captureWideHeader],
+    ...rows.map((row) => [
+      ...row,
+      ...Array(Math.max(0, header.length - row.length)).fill(undefined),
+      ...captureWideValues,
+    ]),
+  ]
+    .map((row) => row.map((value) => JSON.stringify(String(value ?? ''))).join(','))
     .join('\n')
 }
 
@@ -605,7 +1042,8 @@ export function downloadResearchSuite(
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `three-dispose-guard-${suite.measuredAt.slice(0, 10)}.${format}`
+  const timestamp = suite.measuredAt.replace(/[:.]/g, '-')
+  link.download = `three-dispose-guard-browser-suite-${timestamp}.${format}`
   link.click()
   URL.revokeObjectURL(url)
 }

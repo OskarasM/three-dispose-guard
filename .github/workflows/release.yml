@@ -24,9 +24,13 @@ jobs:
       - name: Use an npm CLI with trusted-publishing support
         run: npm install --global npm@latest
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - name: Verify the tag matches package.json
+        run: node -e "const p=require('./package.json'); if (process.env.GITHUB_REF_NAME !== 'v' + p.version) throw new Error('Tag and package version differ')"
+      - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run release:check
       - name: Publish with npm provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --provenance --access public
       - name: Create the GitHub release
         env:
