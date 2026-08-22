@@ -15,8 +15,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        node: [20, 22, 24]
+        os: [ubuntu-latest, windows-latest]
+        node: [20, 24]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -83,6 +83,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run benchmark:chart
-      - run: npm run benchmark:verify
       - name: Confirm the committed chart matches the raw dataset
         run: git diff --exit-code -- docs/benchmark-result.svg

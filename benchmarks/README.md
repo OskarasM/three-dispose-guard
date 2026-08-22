@@ -1,10 +1,10 @@
 # Benchmark results
 
-This directory contains raw WebGL lifecycle measurements and their machine-readable schema.
+This directory contains raw WebGL lifecycle measurements.
 
 ## Schema versions
 
-Schema v2 is defined by [`research-capture.schema.json`](research-capture.schema.json). A v2 capture includes:
+A schema v2 capture includes:
 
 - a discarded warm-up for all six scenarios;
 - five repeated 50-cycle executions of every scenario;
@@ -53,4 +53,4 @@ The unique-resource series is a lifecycle reproduction, not evidence that R3F ge
 
 Cells marked `not-measured` or `not-applicable` are limitations, not implied successes. See [the methodology](../docs/methodology.md) before comparing captures.
 
-Benchmark data is licensed under [CC BY 4.0](../DATA-LICENSE.md). Cite the software and dataset using [CITATION.cff](../CITATION.cff).
+Benchmark data is licensed under [CC BY 4.0](../DATA-LICENSE.md).

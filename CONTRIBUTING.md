@@ -29,7 +29,7 @@ Do not add a performance or memory number to the README unless it came from a co
 
 Schema-v2 captures must contain every variant for every scenario. Use an explicit `not-measured` or `not-applicable` comparison where a variant has no honest implementation.
 
-The JSON file is authoritative. The committed CSV must be generated from it and pass `npm run benchmark:verify`.
+The JSON file is authoritative. The committed CSV and the committed chart must both be generated from it, never edited by hand.
 
 ## R3F cache rule
 
@@ -47,10 +47,10 @@ Also cover rejection or eviction while the loader callback is still pending.
 npm run check
 npm run test:browser:all
 npm run package:check
-npm run benchmark:verify
+npm run benchmark:chart
 npm pack --dry-run
 ```
 
-When measurements change, generate a new dated capture from a clean commit, update the chart and reference manifest, then verify the result. Do not edit raw JSON, CSV or reported values by hand.
+When measurements change, generate a new dated capture from a clean commit and regenerate the chart from it. Do not edit raw JSON, CSV or reported values by hand.
 
 Keep documentation in British English and avoid claims that imply every R3F scene requires this package.

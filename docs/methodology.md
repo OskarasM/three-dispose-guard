@@ -89,11 +89,11 @@ npm run benchmark:capture
 npm run benchmark:chart
 ```
 
-The capture validates all six scenarios before writing. It refuses approximate package versions or a missing scenario run. JSON follows [the schema](../benchmarks/research-capture.schema.json); CSV uses typed records documented in [the benchmark guide](../benchmarks/README.md).
+The capture validates all six scenarios before writing. It refuses approximate package versions or a missing scenario run. Both the JSON shape and the typed CSV records are documented in [the benchmark guide](../benchmarks/README.md).
 
 A dirty-worktree capture is allowed for development but is marked `git_worktree_dirty=true`. A public reference should be generated from a clean commit. Different hardware, browsers or dependency sets produce separate collision-safe files and are never merged into one result.
 
-The benchmark data is licensed separately under [CC BY 4.0](../DATA-LICENSE.md). Citation metadata is in [CITATION.cff](../CITATION.cff).
+The benchmark data is licensed separately under [CC BY 4.0](../DATA-LICENSE.md).
 
 ## Threats to validity
 

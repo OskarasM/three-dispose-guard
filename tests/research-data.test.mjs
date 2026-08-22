@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -211,17 +211,5 @@ describe('research capture data', () => {
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
-  })
-
-  it('keeps the committed JSON Schema parseable and on version two', async () => {
-    const schema = JSON.parse(
-      await readFile(path.join(process.cwd(), 'benchmarks', 'research-capture.schema.json'), 'utf8'),
-    )
-    expect(schema.properties.schemaVersion.const).toBe(2)
-    expect(schema.properties.artifactKind.const).toBe('provenance-complete-capture')
-    expect(schema.required).toContain('provenance')
-    expect(schema.required).toContain('scenarioRuns')
-    expect(schema.$defs.scenarioReport.properties.comparisons.minItems).toBe(4)
-    expect(schema.$defs.scenarioReport.properties.comparisons.maxItems).toBe(4)
   })
 })

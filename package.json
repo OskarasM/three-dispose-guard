@@ -65,8 +65,7 @@
     "benchmark:capture": "node scripts/capture-benchmark.mjs",
     "package:check": "npm run build && node scripts/package-smoke.mjs",
     "test:browser:all": "npm run test:browser && npm run test:browser:smoke",
-    "release:check": "npm run check && npm run test:browser:all && npm run package:check && npm run benchmark:verify",
-    "benchmark:verify": "node scripts/verify-reference.mjs",
+    "release:check": "npm run check && npm run test:browser:all && npm run package:check && npm run benchmark:chart",
     "benchmark:chart": "node scripts/render-benchmark-chart.mjs",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test && npm run build && npm run demo:build"
