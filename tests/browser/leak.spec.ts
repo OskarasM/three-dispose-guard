@@ -211,3 +211,89 @@ for (const width of [375, 768, 1024, 1440]) {
     await expect(page.getByRole('heading', { name: /Dispose the orphan/i })).toBeVisible()
   })
 }
+
+/* The presentation regressions this suite could not previously catch.
+   Both of these were real defects: no web font was ever fetched, so the site
+   rendered in whatever the visitor had installed, and there was no social card
+   at all, so every link to this page unfurled blank. Neither shows up in a
+   typecheck, a unit test or a build, and both are silent to look at. */
+
+test('@smoke the self-hosted typefaces actually load', async ({ page }) => {
+  const fontRequests: { url: string; status: number }[] = []
+  page.on('response', (response) => {
+    if (/\.woff2?($|\?)/.test(response.url())) {
+      fontRequests.push({ url: response.url(), status: response.status() })
+    }
+  })
+
+  await page.goto('/')
+  await page.evaluate(() => document.fonts.ready)
+
+  // document.fonts.check() is not enough on its own: for a family with no
+  // @font-face rule at all it reports true, because the text can still be
+  // rendered with a fallback. Ask the FontFaceSet what it actually holds.
+  const faces = await page.evaluate(() =>
+    [...document.fonts].map((face) => ({ family: face.family, status: face.status })),
+  )
+  const loaded = (family: string) =>
+    faces.some((face) => face.family === family && face.status === 'loaded')
+
+  expect(loaded('Archivo'), `display face missing. Present: ${JSON.stringify(faces)}`).toBe(true)
+  expect(loaded('Atkinson Next'), 'body face missing').toBe(true)
+  expect(loaded('Commit Mono'), 'chrome face missing').toBe(true)
+
+  const headingFamily = await page.evaluate(
+    () => getComputedStyle(document.querySelector('h1')!).fontFamily,
+  )
+  expect(headingFamily).toContain('Archivo')
+
+  // The files have to arrive, and they have to arrive from this origin. A font
+  // CDN would put visitor IP addresses on a third party and make the page
+  // depend on files that can change underneath it.
+  expect(fontRequests.length, 'no font file was requested at all').toBeGreaterThan(0)
+  for (const request of fontRequests) {
+    expect(request.status, `font request failed: ${request.url}`).toBe(200)
+    expect(new URL(request.url).origin, `font served cross-origin: ${request.url}`).toBe(
+      new URL(page.url()).origin,
+    )
+  }
+})
+
+test('@smoke the page carries the metadata a shared link needs', async ({ page }) => {
+  const response = await page.goto('/')
+  expect(response?.status()).toBe(200)
+
+  const meta = await page.evaluate(() => {
+    const content = (selector: string) =>
+      document.querySelector<HTMLMetaElement>(selector)?.content ?? null
+    return {
+      title: document.title,
+      description: content('meta[name="description"]'),
+      ogTitle: content('meta[property="og:title"]'),
+      ogDescription: content('meta[property="og:description"]'),
+      ogImage: content('meta[property="og:image"]'),
+      twitterCard: content('meta[name="twitter:card"]'),
+      canonical: document.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href ?? null,
+    }
+  })
+
+  expect(meta.title.length).toBeGreaterThan(20)
+  expect(meta.description?.length ?? 0).toBeGreaterThan(60)
+  expect(meta.ogTitle).toBeTruthy()
+  expect(meta.ogDescription).toBeTruthy()
+  expect(meta.twitterCard).toBe('summary_large_image')
+  expect(meta.canonical).toBeTruthy()
+
+  // The card image has to exist, not merely be referenced.
+  expect(meta.ogImage).toBeTruthy()
+  const image = await page.request.get(new URL(meta.ogImage!).pathname)
+  expect(image.status(), 'og:image is referenced but not served').toBe(200)
+  expect(Number(image.headers()['content-length'] ?? 0)).toBeGreaterThan(1000)
+})
+
+test('the footer links to both sibling projects', async ({ page }) => {
+  await page.goto('/')
+  const footer = page.locator('.site-footer')
+  await expect(footer.getByRole('link', { name: 'scene-narrator' })).toBeVisible()
+  await expect(footer.getByRole('link', { name: 'realtime-3d-room' })).toBeVisible()
+})
