@@ -736,8 +736,11 @@ function ProductModel() {
   return <GuardedPrimitive object={gltf.scene} />
 }
 
-// Your cache policy decides when this happens.
-cache.evict(GLTFLoader, '/shoe.glb')`}</code></pre>
+// Your cache policy decides when this runs.
+// Never evict at module load.
+export function releaseProductAssets() {
+  cache.evict(GLTFLoader, '/shoe.glb')
+}`}</code></pre>
           </article>
         </section>
 

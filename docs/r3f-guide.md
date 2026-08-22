@@ -77,7 +77,7 @@ When eviction occurs before resolution:
 3. The result is temporarily adopted as owned.
 4. Microtask finalisation cleans it after any same-tick consumer has had an opportunity to claim it.
 
-Rejected loads propagate their original error, create no cache protection and may be retried as a fresh generation. For array inputs, late sibling completions from a rejected generation are also cleaned.
+Rejected loads surface the loader's own failure, create no cache protection and may be retried as a fresh generation. React Three Fiber may wrap the failure before it reaches your error boundary, so match on the message rather than asserting the identity of the Error object. For array inputs, late sibling completions from a rejected generation are also cleaned.
 
 The browser lab and integration suite exercise these flows with deterministic loaders.
 
