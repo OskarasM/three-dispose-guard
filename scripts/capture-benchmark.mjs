@@ -26,10 +26,11 @@ const server = await createServer({
   },
 })
 
-await server.listen()
-const browser = await chromium.launch({ headless: true })
+let browser
 
 try {
+  await server.listen()
+  browser = await chromium.launch({ headless: true })
   const page = await browser.newPage()
   await page.goto(`http://127.0.0.1:${port}`, { waitUntil: 'networkidle' })
   const suite = await page.evaluate(() => window.__disposeGuard.runResearchSuite(5, 50))
@@ -90,6 +91,6 @@ try {
     ),
   }, null, 2))
 } finally {
-  await browser.close()
+  await browser?.close()
   await server.close()
 }

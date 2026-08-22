@@ -36,19 +36,34 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./react": {
-      "types": "./dist/react.d.ts",
-      "import": "./dist/react.js",
-      "require": "./dist/react.cjs"
+      "import": {
+        "types": "./dist/react.d.ts",
+        "default": "./dist/react.js"
+      },
+      "require": {
+        "types": "./dist/react.d.cts",
+        "default": "./dist/react.cjs"
+      }
     },
     "./r3f": {
-      "types": "./dist/r3f.d.ts",
-      "import": "./dist/r3f.js",
-      "require": "./dist/r3f.cjs"
+      "import": {
+        "types": "./dist/r3f.d.ts",
+        "default": "./dist/r3f.js"
+      },
+      "require": {
+        "types": "./dist/r3f.d.cts",
+        "default": "./dist/r3f.cjs"
+      }
     },
     "./package.json": "./package.json"
   },
