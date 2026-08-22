@@ -217,8 +217,26 @@ h1 em {
 }
 
 .visual-label-bottom strong {
+  /* The count is the one live number in the hero, so it is given tabular
+     figures and a fixed width: a readout that shifts as it counts down reads
+     as decoration, and this one is meant to be read. */
+  min-width: 4ch;
   color: var(--ink);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  transition: color var(--t) var(--ease);
+}
+
+/* Zero is the moment the package exists for, so it is the only state that
+   takes the warning colour. */
+.visual-label-bottom strong.is-zero {
+  color: var(--warn);
+}
+
+.visual-verdict {
+  min-width: 15ch;
+  text-align: right;
 }
 
 .orbital-line {

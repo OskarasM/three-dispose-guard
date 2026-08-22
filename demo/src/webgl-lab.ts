@@ -5,13 +5,15 @@ import {
   DataTexture,
   DirectionalLight,
   Group,
+  MeshBasicMaterial,
   Mesh,
   MeshStandardMaterial,
+  NearestFilter,
   PerspectiveCamera,
   RGBAFormat,
   Scene,
   SphereGeometry,
-  TorusKnotGeometry,
+  TorusGeometry,
   WebGLRenderer,
 } from 'three'
 import {
@@ -447,7 +449,62 @@ export function runSharedAssetProof(): SharedAssetProof {
   return proof
 }
 
-export function mountHeroScene(canvas: HTMLCanvasElement): () => void {
+/* The hero's shared texture is deliberately a flat, high-contrast pattern
+   rather than the noise the benchmark uses. The point the scene has to make is
+   that all three consumers are drawing the SAME asset, and identical noise is
+   hard to read as identical. A crisp grid with one offset marker cell is
+   obvious at a glance and at hero size. */
+function createSharedHeroTexture(): DataTexture {
+  const size = 8
+  const data = new Uint8Array(size * size * 4)
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const index = (y * size + x) * 4
+      const edge = x === 0 || y === 0
+      const marker = x === 2 && y === 2
+      const [r, g, b] = marker
+        ? [255, 101, 69]
+        : edge
+          ? [16, 21, 10]
+          : [216, 255, 83]
+      data[index] = r
+      data[index + 1] = g
+      data[index + 2] = b
+      data[index + 3] = 255
+    }
+  }
+  const texture = new DataTexture(data, size, size, RGBAFormat)
+  texture.magFilter = NearestFilter
+  texture.minFilter = NearestFilter
+  texture.needsUpdate = true
+  return texture
+}
+
+export interface HeroOwnershipState {
+  /** How many consumers currently hold the shared asset. */
+  owners: number
+  /** True while the shared asset is still allocated on the GPU. */
+  alive: boolean
+  /** What just happened, in the words the package uses. */
+  event: 'holding' | 'released' | 'disposed' | 'reacquired'
+}
+
+/* The hero used to be a rotating torus knot, which is the only thing on this
+ * page that said nothing. It now runs the argument the package exists to make.
+ *
+ * One geometry and one texture are created once and shared by three consumers.
+ * The consumers release one at a time. The shared asset stays on the GPU while
+ * any owner remains, and is disposed on the frame the last one lets go, which
+ * is the whole thesis: the safe moment is when the count reaches zero, not when
+ * the first component unmounts.
+ *
+ * The count is read from a real registry rather than tracked alongside one, so
+ * the number on screen is the package's own answer and cannot drift from it.
+ */
+export function mountHeroScene(
+  canvas: HTMLCanvasElement,
+  onState?: (state: HeroOwnershipState) => void,
+): () => void {
   const renderer = new WebGLRenderer({
     canvas,
     antialias: true,
@@ -457,34 +514,105 @@ export function mountHeroScene(canvas: HTMLCanvasElement): () => void {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75))
   const scene = new Scene()
   const camera = new PerspectiveCamera(36, 1, 0.1, 40)
-  camera.position.set(0, 0.3, 7.5)
+  camera.position.set(0, 1.15, 9.4)
+  camera.lookAt(0, 0, 0)
 
-  const group = new Group()
-  const shell = new Mesh(
-    new TorusKnotGeometry(1.18, 0.33, 164, 24, 2, 3),
-    new MeshStandardMaterial({
-      color: '#d8ff53',
-      roughness: 0.28,
-      metalness: 0.22,
-    }),
-  )
-  const core = new Mesh(
-    new SphereGeometry(0.68, 32, 20),
-    new MeshStandardMaterial({ color: '#ff5c39', roughness: 0.46 }),
-  )
-  group.add(shell, core)
-  scene.add(group)
-
-  const key = new DirectionalLight(0xffffff, 4)
-  key.position.set(3, 4, 6)
-  const fill = new DirectionalLight(0x91b9ff, 2.5)
-  fill.position.set(-5, -2, 2)
-  scene.add(new AmbientLight(0xffffff, 0.65), key, fill)
+  // The shared asset. One geometry, one texture, one material, referenced by
+  // every consumer below. Nothing here is cloned.
+  const sharedGeometry = new BoxGeometry(1, 1, 1)
+  const sharedTexture = createSharedHeroTexture()
+  const sharedMaterial = new MeshStandardMaterial({
+    color: '#d8ff53',
+    map: sharedTexture,
+    roughness: 0.34,
+    metalness: 0.18,
+  })
 
   const registry = createResourceRegistry({ mode: 'dispose' })
-  const lease = registry.acquire(group, { ownership: 'owned', label: 'hero scene' })
+
+  const stage = new Group()
+  scene.add(stage)
+
+  // Three consumers on a ring, each mounting the same asset.
+  const CONSUMERS = 3
+  const radius = 2.5
+  const consumers = Array.from({ length: CONSUMERS }, (_, index) => {
+    const angle = (index / CONSUMERS) * Math.PI * 2
+    const mesh = new Mesh(sharedGeometry, sharedMaterial)
+    mesh.position.set(Math.cos(angle) * radius, Math.sin(angle) * radius * 0.34, Math.sin(angle) * radius * 0.5)
+    stage.add(mesh)
+    return { mesh, angle, holding: true, lease: null as null | ReturnType<typeof registry.acquire> }
+  })
+
+  // The core stands for the asset itself: lit while owned, dark once disposed.
+  const core = new Mesh(
+    new SphereGeometry(0.52, 32, 20),
+    new MeshStandardMaterial({ color: '#d8ff53', roughness: 0.4, emissive: new Color('#20300a') }),
+  )
+  stage.add(core)
+
+  // A hairline ring joining the consumers to the thing they share.
+  const ring = new Mesh(
+    new TorusGeometry(radius * 0.78, 0.012, 8, 96),
+    new MeshBasicMaterial({ color: '#3a413a' }),
+  )
+  ring.scale.set(1, 0.42, 1)
+  stage.add(ring)
+
+  const key = new DirectionalLight(0xffffff, 3.4)
+  key.position.set(3, 4, 6)
+  const fill = new DirectionalLight(0x91b9ff, 2)
+  fill.position.set(-5, -2, 2)
+  scene.add(new AmbientLight(0xffffff, 0.7), key, fill)
+
+  const acquireAll = () => {
+    for (const consumer of consumers) {
+      consumer.lease = registry.acquire(consumer.mesh, {
+        ownership: 'owned',
+        label: 'shared product asset',
+      })
+      consumer.holding = true
+      consumer.mesh.visible = true
+    }
+  }
+  acquireAll()
+
+  const ownerCount = () => registry.snapshot().activeLeases
+
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
   let frame = 0
+  let step = 0
+  let lastStepAt = 0
+  // Slow enough to read the number change, quick enough to see the whole
+  // argument without waiting: four steps, release release release, then reset.
+  const STEP_MS = 1600
+
+  const advance = () => {
+    step = (step + 1) % (CONSUMERS + 1)
+    if (step === 0) {
+      // ponytail: reacquiring after the registry disposed the asset makes
+      // Three.js re-upload it from the JS-side attributes, so this loop churns
+      // one small geometry and one 8x8 texture every cycle. That is the honest
+      // consequence of the thing being demonstrated, and at this size it is
+      // nothing. Hold the asset under a protection and reuse it if the hero
+      // ever grows to a real model.
+      acquireAll()
+      onState?.({ owners: ownerCount(), alive: true, event: 'reacquired' })
+      return
+    }
+    const consumer = consumers[step - 1]
+    if (consumer?.lease) {
+      consumer.lease.release()
+      consumer.lease = null
+      consumer.holding = false
+    }
+    const owners = ownerCount()
+    onState?.({
+      owners,
+      alive: owners > 0,
+      event: owners === 0 ? 'disposed' : 'released',
+    })
+  }
 
   const resize = () => {
     const width = Math.max(1, canvas.clientWidth)
@@ -498,17 +626,48 @@ export function mountHeroScene(canvas: HTMLCanvasElement): () => void {
   resize()
 
   const render = (time: number) => {
-    group.rotation.y = reducedMotion ? 0.3 : time * 0.00018
-    group.rotation.x = reducedMotion ? -0.12 : Math.sin(time * 0.00035) * 0.12
+    if (!reducedMotion) {
+      if (lastStepAt === 0) lastStepAt = time
+      if (time - lastStepAt >= STEP_MS) {
+        lastStepAt = time
+        advance()
+      }
+      stage.rotation.y = time * 0.00016
+      for (const consumer of consumers) {
+        // A released consumer shrinks away rather than vanishing, so the eye
+        // can follow which one let go.
+        const target = consumer.holding ? 1 : 0.001
+        consumer.mesh.scale.setScalar(
+          consumer.mesh.scale.x + (target - consumer.mesh.scale.x) * 0.08,
+        )
+        consumer.mesh.rotation.x = time * 0.0004 + consumer.angle
+        consumer.mesh.rotation.y = time * 0.0003
+      }
+      const owners = ownerCount()
+      const material = core.material as MeshStandardMaterial
+      // The core is only dark once every owner has gone.
+      material.emissive.setHex(owners > 0 ? 0x20300a : 0x000000)
+      material.color.set(owners > 0 ? '#d8ff53' : '#2a2f2b')
+      core.scale.setScalar(owners > 0 ? 1 : 0.72)
+    } else {
+      stage.rotation.y = 0.4
+    }
     renderer.render(scene, camera)
     frame = requestAnimationFrame(render)
   }
   frame = requestAnimationFrame(render)
+  onState?.({ owners: ownerCount(), alive: true, event: 'holding' })
 
   return () => {
     cancelAnimationFrame(frame)
     observer.disconnect()
-    lease.release()
+    for (const consumer of consumers) consumer.lease?.release()
+    // The registry disposed the shared asset when the last lease went. These
+    // are the objects it does not own: the core, the ring and the renderer.
+    core.geometry.dispose()
+    ;(core.material as MeshStandardMaterial).dispose()
+    ring.geometry.dispose()
+    ;(ring.material as MeshBasicMaterial).dispose()
     renderer.dispose()
     renderer.forceContextLoss()
   }
