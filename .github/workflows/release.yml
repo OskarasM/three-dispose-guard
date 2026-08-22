@@ -28,9 +28,15 @@ jobs:
         run: node -e "const p=require('./package.json'); if (process.env.GITHUB_REF_NAME !== 'v' + p.version) throw new Error('Tag and package version differ')"
       - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run release:check
+      # No NODE_AUTH_TOKEN. Authentication is npm trusted publishing over OIDC, using the
+      # short-lived token that `id-token: write` lets GitHub mint for this workflow. Setting
+      # a token here would take precedence and quietly put a long-lived credential back in
+      # the loop.
+      #
+      # npm is told to trust organisation OskarasM, repository three-dispose-guard, workflow
+      # file release.yml, environment npm. All four have to keep matching this file, and the
+      # environment on the job above is part of that match.
       - name: Publish with npm provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --provenance --access public
       - name: Create the GitHub release
         env:
