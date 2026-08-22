@@ -145,7 +145,7 @@ pre {
 
 .site-header nav a,
 .header-link,
-.site-footer > a:last-child {
+.footer-links a {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
@@ -157,7 +157,7 @@ pre {
 
 .site-header nav a:hover,
 .header-link:hover,
-.site-footer > a:last-child:hover {
+.footer-links a:hover {
   color: var(--ink);
 }
 
@@ -723,8 +723,11 @@ h1 em {
   margin: 0;
 }
 
-.site-footer > a:last-child {
+.footer-links {
   justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: var(--gutter);
 }
 
 @media (max-width: 1024px) {
@@ -923,5 +926,19 @@ h1 em {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* The sibling sites sit before a hairline, back-to-top after it, because one
+   pair leaves this site and the other does not. */
+.footer-links a:last-child {
+  padding-left: var(--gutter);
+  border-left: 1px solid var(--line);
+}
+
+@media (max-width: 768px) {
+  .footer-links {
+    justify-self: start;
+    flex-wrap: wrap;
   }
 }

@@ -1,3 +1,5 @@
+<img src="demo/public/favicon.svg" alt="" width="56" height="56" align="left">
+
 # three-dispose-guard
 
 Ownership-aware GPU resource disposal for Three.js and React Three Fiber.
@@ -266,6 +268,20 @@ The package is tested as ESM and CommonJS, with TypeScript declarations and inde
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a change. Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md); do not include exploit details in a public issue.
 
+## Related
+
+Two other pieces of the same problem, built in the open:
+
+- [scene-narrator](https://github.com/OskarasM/scene-narrator) makes a moving
+  Three.js scene usable with a screen reader without spending the frame budget
+  on it. [Demo](https://scene-narrator-inky.vercel.app)
+- [realtime-3d-room](https://github.com/OskarasM/realtime-3d-room) is a shared
+  3D room over Supabase Realtime, with a written guide to why presence cannot
+  carry position. [Demo](https://realtime-3d-room.vercel.app)
+
 ## Licence
 
 MIT © Oskaras Margevicius
+
+The site self-hosts four typefaces, all under the SIL Open Font License 1.1.
+Their licence texts ship beside the files in `demo/public/fonts/`.
