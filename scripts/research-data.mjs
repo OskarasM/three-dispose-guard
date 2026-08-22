@@ -259,7 +259,10 @@ const csvColumns = [
 ]
 
 function csvValue(value) {
-  return JSON.stringify(value == null ? '' : String(value))
+  // A leading =, +, - or @ is read as a formula by every major spreadsheet,
+  // and quoting does not prevent it. A leading tab keeps the cell text.
+  const text = value == null ? '' : String(value)
+  return JSON.stringify(/^[=+\-@\t\r]/.test(text) ? `\t${text}` : text)
 }
 
 function sharedColumns(capture) {

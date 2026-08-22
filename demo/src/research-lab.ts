@@ -1025,8 +1025,18 @@ export function researchSuiteToCsv(suite: ResearchSuite): string {
       ...captureWideValues,
     ]),
   ]
-    .map((row) => row.map((value) => JSON.stringify(String(value ?? ''))).join(','))
+    .map((row) => row.map((value) => csvCell(value)).join(','))
     .join('\n')
+}
+
+/* Spreadsheets read a leading =, +, - or @ as the start of a formula, and
+   quoting the field does not stop them. Everything here is generated locally
+   so nothing hostile can reach it today, but this file offers a download and a
+   download is the wrong place to rely on that staying true. A leading tab
+   keeps the cell text and is stripped by every importer that matters. */
+function csvCell(value: unknown): string {
+  const text = String(value ?? '')
+  return JSON.stringify(/^[=+\-@\t\r]/.test(text) ? `\t${text}` : text)
 }
 
 export function downloadResearchSuite(
