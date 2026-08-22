@@ -145,6 +145,53 @@ describe('ResourceRegistry ownership', () => {
     expect(registry.snapshot().trackedResources).toBe(0)
   })
 
+  it('lets a protection reclaim a pending microtask disposal', async () => {
+    const { mesh, texture } = sharedMesh()
+    const dispose = vi.spyOn(texture, 'dispose')
+    const registry = createResourceRegistry({ mode: 'dispose' })
+    const lease = registry.acquire(mesh, {
+      ownership: 'owned',
+      releasePolicy: 'microtask',
+      label: 'component cleanup',
+    })
+
+    lease.release()
+    expect(registry.snapshot().pendingDisposals).toBe(3)
+
+    const protection = registry.protect(mesh, { label: 'cache hand-off' })
+
+    expect(registry.snapshot().pendingDisposals).toBe(0)
+    expect(registry.snapshot().events).toContainEqual(expect.objectContaining({
+      type: 'disposal-cancelled',
+      label: 'cache hand-off',
+      resourceCount: 3,
+    }))
+
+    await Promise.resolve()
+    expect(dispose).not.toHaveBeenCalled()
+
+    protection.release()
+    expect(dispose).toHaveBeenCalledOnce()
+    expect(registry.snapshot().trackedResources).toBe(0)
+  })
+
+  it('deeply freezes diagnostic scope records', () => {
+    const { mesh } = sharedMesh()
+    const registry = createResourceRegistry()
+    const lease = registry.acquire(mesh, { ownership: 'owned', label: 'immutable scope' })
+    const snapshot = registry.snapshot()
+    const scope = snapshot.scopes[0]
+
+    expect(Object.isFrozen(scope)).toBe(true)
+    expect(() => {
+      ;(scope as { label: string }).label = 'mutated'
+    }).toThrow()
+    expect(registry.snapshot().scopes[0].label).toBe('immutable scope')
+
+    lease.release()
+  })
+
+
   it('extends collection for application-specific resource containers', () => {
     const pass = { dispose: vi.fn() }
     const root = { postProcessingPass: pass }

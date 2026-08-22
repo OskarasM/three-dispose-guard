@@ -62,4 +62,12 @@ describe('collectDisposableResources', () => {
 
     expect(resources).toEqual(new Set([target]))
   })
+  it('suppresses attachments that also appear elsewhere in a mixed root', () => {
+    const target = new WebGLRenderTarget(16, 16)
+    const material = new MeshBasicMaterial({ map: target.texture })
+
+    const resources = collectDisposableResources([target, target.texture, material])
+
+    expect(resources).toEqual(new Set([target, material]))
+  })
 })

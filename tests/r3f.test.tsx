@@ -109,10 +109,26 @@ class RejectOnceLoader extends Loader<TestAsset, string> {
   }
 }
 
+class ThrowOnceLoader extends Loader<TestAsset, string> {
+  static attempts = 0
+  static readonly originalError = new Error('loader threw synchronously once')
+
+  load(_url: string, onLoad: (asset: TestAsset) => void): void {
+    ThrowOnceLoader.attempts += 1
+    if (ThrowOnceLoader.attempts === 1) throw ThrowOnceLoader.originalError
+
+    const loaded = createAsset()
+    ImmediateLoader.loaded.push(loaded)
+    queueMicrotask(() => onLoad(loaded.asset))
+  }
+}
+
+
 beforeEach(() => {
   ImmediateLoader.loaded = []
   DeferredLoader.pending = []
   KeyedDeferredLoader.pending = []
+  ThrowOnceLoader.attempts = 0
   RejectOnceLoader.attempts = 0
 })
 
@@ -304,6 +320,51 @@ describe('R3FResourceCache', () => {
     cache.evict(RejectOnceLoader, '/retry.glb')
     expect(ImmediateLoader.loaded[0].textureDispose).toHaveBeenCalledOnce()
   })
+
+  it('turns a synchronous loader throw into a retryable rejected generation', async () => {
+    const registry = createResourceRegistry({ mode: 'dispose' })
+    const cache = createR3FResourceCache({ registry })
+
+    cache.preload(ThrowOnceLoader, '/sync-retry.glb')
+    await vi.waitFor(() => expect(cache.snapshot().errors).toBe(1))
+
+    expect(cache.snapshot().entries[0]?.error).toBe(ThrowOnceLoader.originalError.message)
+    expect(registry.snapshot().activeProtections).toBe(0)
+
+    cache.preload(ThrowOnceLoader, '/sync-retry.glb')
+    await vi.waitFor(() => expect(cache.snapshot().ready).toBe(1))
+
+    expect(ThrowOnceLoader.attempts).toBe(2)
+    cache.evict(ThrowOnceLoader, '/sync-retry.glb')
+    expect(ImmediateLoader.loaded[0].textureDispose).toHaveBeenCalledOnce()
+  })
+
+  it('turns a loader-extension throw into a retryable rejected generation', async () => {
+    const registry = createResourceRegistry({ mode: 'dispose' })
+    const cache = createR3FResourceCache({ registry })
+    const originalError = new Error('extension threw once')
+    let extensionAttempts = 0
+    const extension = () => {
+      extensionAttempts += 1
+      if (extensionAttempts === 1) throw originalError
+    }
+
+    expect(() => {
+      cache.preload(ImmediateLoader, '/extension-retry.glb', extension)
+    }).toThrow(originalError)
+    await vi.waitFor(() => expect(cache.snapshot().errors).toBe(1))
+
+    expect(cache.snapshot().entries[0]?.error).toBe(originalError.message)
+    expect(registry.snapshot().activeProtections).toBe(0)
+
+    cache.preload(ImmediateLoader, '/extension-retry.glb', extension)
+    await vi.waitFor(() => expect(cache.snapshot().ready).toBe(1))
+
+    expect(extensionAttempts).toBe(2)
+    cache.evict(ImmediateLoader, '/extension-retry.glb')
+    expect(ImmediateLoader.loaded[0].textureDispose).toHaveBeenCalledOnce()
+  })
+
 
   it('refuses two registries claiming the same global R3F cache entry', async () => {
     const first = createR3FResourceCache({

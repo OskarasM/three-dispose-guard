@@ -157,18 +157,23 @@ function instrumentLoader(
         }
       }
 
-      return originalLoad(
-        input,
-        (result: unknown) => {
-          matched?.resolve(result)
-          onLoad(result)
-        },
-        onProgress,
-        (error: unknown) => {
-          matched?.reject(error)
-          onError?.(error)
-        },
-      )
+      try {
+        return originalLoad(
+          input,
+          (result: unknown) => {
+            matched?.resolve(result)
+            onLoad(result)
+          },
+          onProgress,
+          (error: unknown) => {
+            matched?.reject(error)
+            onError?.(error)
+          },
+        )
+      } catch (error) {
+        matched?.reject(error)
+        throw error
+      }
     }) as typeof loader.load
 
     instrumentedLoaders.set(loader, instrumentation)
@@ -266,6 +271,7 @@ class R3FResourceCacheImpl implements R3FResourceCache {
     if (existing) {
       if (existing.status !== 'error') return existing
       entries.delete(key)
+      useLoader.clear(existing.r3fLoader, existing.input)
       this.releaseClaim(loader, key)
     }
 
@@ -293,8 +299,13 @@ class R3FResourceCacheImpl implements R3FResourceCache {
     extensions?: GuardedLoaderExtensions<L>,
   ): (loader: LoaderLike) => void {
     return (loader) => {
-      extensions?.(loader as GuardedLoaderInstance<L>)
       const generation = entry.generation
+      try {
+        extensions?.(loader as GuardedLoaderInstance<L>)
+      } catch (error) {
+        this.reject(entry, generation, error)
+        throw error
+      }
       instrumentLoader(loader, {
         entry,
         generation,

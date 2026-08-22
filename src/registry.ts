@@ -116,13 +116,23 @@ export class ResourceRegistry {
       released: false,
     }
 
+    const reclaimed = new Set<DisposableResource>()
+
     for (const resource of resources) {
       const record = this.getOrCreateRecord(resource)
+      if (record.pending) {
+        record.pending = false
+        this.pendingRecords.delete(record)
+        reclaimed.add(resource)
+      }
       record.protections += 1
       record.everOwned = true
     }
 
     this.protections.set(state.id, state)
+    if (reclaimed.size > 0) {
+      this.recordEvent('disposal-cancelled', { ...state, resources: reclaimed })
+    }
     this.recordEvent('protected', state)
     this.emit()
     return this.createHandle(state, () => this.releaseProtection(state.id))
@@ -325,14 +335,14 @@ export class ResourceRegistry {
 
   private scopeSnapshots(): RegistryScopeSnapshot[] {
     return [
-      ...[...this.leases.values()].map((lease): RegistryScopeSnapshot => ({
+      ...[...this.leases.values()].map((lease): RegistryScopeSnapshot => Object.freeze({
         id: lease.id,
         type: 'lease',
         label: lease.label,
         ownership: lease.ownership,
         resourceCount: lease.resources.size,
       })),
-      ...[...this.protections.values()].map((protection): RegistryScopeSnapshot => ({
+      ...[...this.protections.values()].map((protection): RegistryScopeSnapshot => Object.freeze({
         id: protection.id,
         type: 'protection',
         label: protection.label,

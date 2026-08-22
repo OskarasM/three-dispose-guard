@@ -144,6 +144,28 @@ function collectResource(
   }
 }
 
+function removeOwnedRenderTargetAttachments(
+  resources: Set<DisposableResource>,
+): void {
+  const removeAttachment = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      for (const attachment of value) removeAttachment(attachment)
+      return
+    }
+    if (isDisposableResource(value) && resourceKind(value) === 'texture') {
+      resources.delete(value)
+    }
+  }
+
+  for (const resource of [...resources]) {
+    if (resourceKind(resource) !== 'renderTarget') continue
+    const target = resource as ThreeLike
+    removeAttachment(target.texture)
+    removeAttachment(target.textures)
+    removeAttachment(target.depthTexture)
+  }
+}
+
 /**
  * Collects disposable Three.js resources from an Object3D, a material, a render
  * target, or the common shape returned by loaders such as GLTFLoader.
@@ -151,6 +173,7 @@ function collectResource(
 export function collectDisposableResources(root: ResourceRoot): Set<DisposableResource> {
   const resources = new Set<DisposableResource>()
   collectResource(root, resources, new WeakSet<object>())
+  removeOwnedRenderTargetAttachments(resources)
   return resources
 }
 
