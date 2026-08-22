@@ -171,7 +171,9 @@ describe('ResourceRegistry ownership', () => {
   })
 
   it('reports disposal failures and continues cleanup', () => {
-    const onError = vi.fn()
+    const onError = vi.fn(() => {
+      throw new Error('diagnostic callback failed')
+    })
     const failing = {
       dispose: vi.fn(() => {
         throw new Error('driver refused cleanup')
@@ -181,7 +183,7 @@ describe('ResourceRegistry ownership', () => {
     const registry = createResourceRegistry({ mode: 'dispose', onError })
     const lease = registry.acquire([failing, healthy], { ownership: 'owned' })
 
-    lease.release()
+    expect(() => lease.release()).not.toThrow()
 
     expect(failing.dispose).toHaveBeenCalledOnce()
     expect(healthy.dispose).toHaveBeenCalledOnce()

@@ -64,6 +64,29 @@ class DeferredLoader extends Loader<TestAsset, string> {
   }
 }
 
+class KeyedDeferredLoader extends Loader<TestAsset, string> {
+  static pending: Array<LoadedAsset & {
+    url: string
+    resolve: () => void
+    reject: (error: unknown) => void
+  }> = []
+
+  load(
+    url: string,
+    onLoad: (asset: TestAsset) => void,
+    _onProgress?: (event: ProgressEvent) => void,
+    onError?: (error: unknown) => void,
+  ): void {
+    const loaded = createAsset()
+    KeyedDeferredLoader.pending.push({
+      ...loaded,
+      url,
+      resolve: () => onLoad(loaded.asset),
+      reject: (error) => onError?.(error),
+    })
+  }
+}
+
 class RejectOnceLoader extends Loader<TestAsset, string> {
   static attempts = 0
   static readonly originalError = new Error('loader rejected once')
@@ -89,6 +112,7 @@ class RejectOnceLoader extends Loader<TestAsset, string> {
 beforeEach(() => {
   ImmediateLoader.loaded = []
   DeferredLoader.pending = []
+  KeyedDeferredLoader.pending = []
   RejectOnceLoader.attempts = 0
 })
 
@@ -112,6 +136,21 @@ describe('R3FResourceCache', () => {
     expect(cache.snapshot().entries).toHaveLength(0)
   })
 
+  it('accepts a loader instance for preload and eviction', async () => {
+    const registry = createResourceRegistry({ mode: 'dispose' })
+    const cache = createR3FResourceCache({ registry })
+    const loader = new ImmediateLoader()
+
+    cache.preload(loader, '/instance.glb')
+    await vi.waitFor(() => expect(cache.snapshot().ready).toBe(1))
+
+    expect(registry.snapshot().activeProtections).toBe(1)
+    expect(ImmediateLoader.loaded[0].textureDispose).not.toHaveBeenCalled()
+
+    cache.evict(loader, '/instance.glb')
+    expect(ImmediateLoader.loaded[0].textureDispose).toHaveBeenCalledOnce()
+  })
+
   it('cleans a stale result that resolves after in-flight eviction', async () => {
     const registry = createResourceRegistry({ mode: 'dispose' })
     const cache = createR3FResourceCache({ registry })
@@ -128,6 +167,122 @@ describe('R3FResourceCache', () => {
     expect(DeferredLoader.pending[0].textureDispose).toHaveBeenCalledOnce()
     expect(cache.snapshot().entries).toHaveLength(0)
     expect(registry.snapshot().trackedResources).toBe(0)
+  })
+
+  it('keeps a replacement generation isolated from a late stale result', async () => {
+    const registry = createResourceRegistry({ mode: 'dispose' })
+    const cache = createR3FResourceCache({ registry })
+
+    cache.preload(DeferredLoader, '/generation.glb')
+    cache.evict(DeferredLoader, '/generation.glb')
+    cache.preload(DeferredLoader, '/generation.glb')
+
+    expect(DeferredLoader.pending).toHaveLength(2)
+
+    DeferredLoader.pending[0].resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(DeferredLoader.pending[0].textureDispose).toHaveBeenCalledOnce()
+    expect(DeferredLoader.pending[1].textureDispose).not.toHaveBeenCalled()
+    expect(cache.snapshot().entries[0]).toEqual(expect.objectContaining({
+      status: 'loading',
+      resolvedParts: 0,
+    }))
+
+    DeferredLoader.pending[1].resolve()
+    await vi.waitFor(() => expect(cache.snapshot().ready).toBe(1))
+
+    expect(registry.snapshot().activeProtections).toBe(1)
+    expect(DeferredLoader.pending[1].textureDispose).not.toHaveBeenCalled()
+
+    cache.evict(DeferredLoader, '/generation.glb')
+    expect(DeferredLoader.pending[1].textureDispose).toHaveBeenCalledOnce()
+  })
+
+  it('associates overlapping array loads with their exact cache entry', async () => {
+    const registry = createResourceRegistry({ mode: 'dispose' })
+    const cache = createR3FResourceCache({ registry })
+    const firstInput = ['/shared.glb', '/first.glb']
+    const secondInput = ['/shared.glb', '/second.glb']
+    const firstKey = JSON.stringify(firstInput)
+    const secondKey = JSON.stringify(secondInput)
+    const entry = (key: string) =>
+      cache.snapshot().entries.find((candidate) => candidate.key === key)
+
+    cache.preload(KeyedDeferredLoader, firstInput)
+    cache.preload(KeyedDeferredLoader, secondInput)
+
+    expect(KeyedDeferredLoader.pending.map((pending) => pending.url)).toEqual([
+      '/shared.glb',
+      '/first.glb',
+      '/shared.glb',
+      '/second.glb',
+    ])
+
+    KeyedDeferredLoader.pending[0].resolve()
+    await Promise.resolve()
+
+    expect(entry(firstKey)).toEqual(expect.objectContaining({
+      status: 'loading',
+      resolvedParts: 1,
+    }))
+    expect(entry(secondKey)).toEqual(expect.objectContaining({
+      status: 'loading',
+      resolvedParts: 0,
+    }))
+    expect(registry.snapshot().activeProtections).toBe(1)
+
+    KeyedDeferredLoader.pending[1].resolve()
+    await Promise.resolve()
+
+    expect(entry(firstKey)?.status).toBe('ready')
+    expect(entry(secondKey)?.resolvedParts).toBe(0)
+    expect(registry.snapshot().activeProtections).toBe(2)
+
+    KeyedDeferredLoader.pending[2].resolve()
+    KeyedDeferredLoader.pending[3].resolve()
+    await vi.waitFor(() => expect(cache.snapshot().ready).toBe(2))
+
+    expect(registry.snapshot().activeProtections).toBe(4)
+
+    cache.evict(KeyedDeferredLoader, firstInput)
+    expect(KeyedDeferredLoader.pending[0].textureDispose).toHaveBeenCalledOnce()
+    expect(KeyedDeferredLoader.pending[1].textureDispose).toHaveBeenCalledOnce()
+    expect(KeyedDeferredLoader.pending[2].textureDispose).not.toHaveBeenCalled()
+    expect(KeyedDeferredLoader.pending[3].textureDispose).not.toHaveBeenCalled()
+
+    cache.evict(KeyedDeferredLoader, secondInput)
+    expect(KeyedDeferredLoader.pending[2].textureDispose).toHaveBeenCalledOnce()
+    expect(KeyedDeferredLoader.pending[3].textureDispose).toHaveBeenCalledOnce()
+  })
+
+  it('cleans a late array part after a sibling rejects', async () => {
+    const registry = createResourceRegistry({ mode: 'dispose' })
+    const cache = createR3FResourceCache({ registry })
+    const input = ['/reject.glb', '/late.glb']
+
+    cache.preload(KeyedDeferredLoader, input)
+    expect(KeyedDeferredLoader.pending).toHaveLength(2)
+
+    KeyedDeferredLoader.pending[0].reject(new Error('first part rejected'))
+    await vi.waitFor(() => expect(cache.snapshot().errors).toBe(1))
+
+    expect(registry.snapshot().activeProtections).toBe(0)
+    expect(cache.snapshot().entries[0]?.resources).toBe(0)
+
+    KeyedDeferredLoader.pending[1].resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(KeyedDeferredLoader.pending[1].textureDispose).toHaveBeenCalledOnce()
+    expect(registry.snapshot().activeProtections).toBe(0)
+    expect(registry.snapshot().trackedResources).toBe(0)
+    expect(cache.snapshot().entries[0]).toEqual(expect.objectContaining({
+      status: 'error',
+      resources: 0,
+      resolvedParts: 0,
+    }))
   })
 
   it('leaves rejected entries unprotected and retryable', async () => {

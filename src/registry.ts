@@ -270,7 +270,11 @@ export class ResourceRegistry {
             source: eventSource,
             message: error instanceof Error ? error.message : String(error),
           })
-          this.onError?.(error, record.resource)
+          try {
+            this.onError?.(error, record.resource)
+          } catch {
+            // Diagnostics callbacks must not interrupt cleanup of other resources.
+          }
         }
       }
     }

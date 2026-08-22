@@ -1,6 +1,5 @@
 import {
   useLoader,
-  type Extensions,
   type ThreeElements,
 } from '@react-three/fiber'
 import {
@@ -18,12 +17,16 @@ import type {
 } from './types'
 
 export type GuardedLoaderInput = string | string[]
-export type GuardedLoaderConstructor<T = unknown> = new (...args: any[]) => Loader<T>
+export type GuardedLoaderConstructor<T = unknown> = new (...args: any[]) => Loader<T, any>
 
-type LoaderLike = Loader<any>
-type LoaderRepresentation = GuardedLoaderConstructor<any>
+type LoaderLike = Loader<any, any>
+type LoaderRepresentation = LoaderLike | GuardedLoaderConstructor<any>
+type GuardedLoaderInstance<L extends LoaderRepresentation> =
+  L extends GuardedLoaderConstructor<any> ? InstanceType<L> : L
+export type GuardedLoaderExtensions<L extends LoaderRepresentation> =
+  (loader: GuardedLoaderInstance<L>) => void
 type RawGuardedLoaderResult<L extends LoaderRepresentation> =
-  Awaited<ReturnType<InstanceType<L>['loadAsync']>>
+  Awaited<ReturnType<GuardedLoaderInstance<L>['loadAsync']>>
 export type GuardedLoaderResult<L extends LoaderRepresentation> =
   RawGuardedLoaderResult<L> extends { scene: Object3D }
     ? RawGuardedLoaderResult<L> & import('@react-three/fiber').ObjectMap
@@ -34,10 +37,10 @@ type EntryStatus = 'loading' | 'ready' | 'error' | 'evicted'
 
 interface CacheEntry {
   loader: LoaderRepresentation
+  r3fLoader: GuardedLoaderConstructor<any>
   input: GuardedLoaderInput
   key: string
   generation: number
-  partKeys: Set<string>
   expectedParts: number
   resolvedParts: number
   resolvedRoots: Set<unknown>
@@ -70,7 +73,7 @@ export interface R3FResourceCache {
   preload<I extends GuardedLoaderInput, L extends LoaderRepresentation>(
     loader: L,
     input: I,
-    extensions?: Extensions<L>,
+    extensions?: GuardedLoaderExtensions<L>,
   ): void
   evict<I extends GuardedLoaderInput, L extends LoaderRepresentation>(loader: L, input: I): void
   clear(): void
@@ -78,19 +81,39 @@ export interface R3FResourceCache {
   subscribe(listener: R3FCacheListener): () => void
 }
 
-interface LoaderObserver {
-  capture(input: unknown): CacheEntry[]
-  resolve(entry: CacheEntry, result: unknown): void
-  reject(entry: CacheEntry, error: unknown): void
+interface InstrumentedRequest {
+  entry: CacheEntry
+  generation: number
+  parts: unknown[]
+  nextPart: number
+  resolve(result: unknown): void
+  reject(error: unknown): void
 }
 
 interface LoaderInstrumentation {
-  observers: Map<R3FResourceCacheImpl, Map<LoaderRepresentation, LoaderObserver>>
+  requests: InstrumentedRequest[]
 }
 
 const instrumentedLoaders = new WeakMap<object, LoaderInstrumentation>()
+const instanceRepresentations = new WeakMap<LoaderLike, GuardedLoaderConstructor<any>>()
 const cacheClaims = new WeakMap<object, Map<string, R3FResourceCacheImpl>>()
 const internalCache = Symbol('three-dispose-guard.r3f-cache')
+
+function r3fLoaderRepresentation(
+  loader: LoaderRepresentation,
+): GuardedLoaderConstructor<any> {
+  if (typeof loader === 'function') return loader
+
+  let representation = instanceRepresentations.get(loader)
+  if (!representation) {
+    const sharedLoader = loader
+    representation = function GuardedLoaderRepresentation() {
+      return sharedLoader
+    } as unknown as GuardedLoaderConstructor<any>
+    instanceRepresentations.set(loader, representation)
+  }
+  return representation
+}
 
 function inputParts(input: GuardedLoaderInput): unknown[] {
   return Array.isArray(input) ? [...input] : [input]
@@ -110,32 +133,39 @@ function inputLabel(input: GuardedLoaderInput): string {
 
 function instrumentLoader(
   loader: LoaderLike,
-  representation: LoaderRepresentation,
-  cache: R3FResourceCacheImpl,
-  observer: LoaderObserver,
+  request: InstrumentedRequest,
 ): void {
   let instrumentation = instrumentedLoaders.get(loader)
   if (!instrumentation) {
     const originalLoad = loader.load.bind(loader) as (...args: any[]) => unknown
-    instrumentation = { observers: new Map() }
+    instrumentation = { requests: [] }
     const sharedInstrumentation = instrumentation
 
     loader.load = ((input: unknown, onLoad: (result: unknown) => void, onProgress?: unknown, onError?: (error: unknown) => void) => {
-      const targets = [...sharedInstrumentation.observers.values()].flatMap((representations) =>
-        [...representations.values()].flatMap((candidate) =>
-          candidate.capture(input).map((entry) => ({ observer: candidate, entry })),
-        ),
+      const partKey = inputKey(input)
+      const requestIndex = sharedInstrumentation.requests.findIndex(
+        (candidate) => inputKey(candidate.parts[candidate.nextPart]) === partKey,
       )
+      const matched = requestIndex === -1
+        ? undefined
+        : sharedInstrumentation.requests[requestIndex]
+
+      if (matched) {
+        matched.nextPart += 1
+        if (matched.nextPart >= matched.parts.length) {
+          sharedInstrumentation.requests.splice(requestIndex, 1)
+        }
+      }
 
       return originalLoad(
         input,
         (result: unknown) => {
-          for (const target of targets) target.observer.resolve(target.entry, result)
+          matched?.resolve(result)
           onLoad(result)
         },
         onProgress,
         (error: unknown) => {
-          for (const target of targets) target.observer.reject(target.entry, error)
+          matched?.reject(error)
           onError?.(error)
         },
       )
@@ -144,12 +174,7 @@ function instrumentLoader(
     instrumentedLoaders.set(loader, instrumentation)
   }
 
-  let representations = instrumentation.observers.get(cache)
-  if (!representations) {
-    representations = new Map()
-    instrumentation.observers.set(cache, representations)
-  }
-  representations.set(representation, observer)
+  if (request.parts.length > 0) instrumentation.requests.push(request)
 }
 
 class R3FResourceCacheImpl implements R3FResourceCache {
@@ -168,17 +193,21 @@ class R3FResourceCacheImpl implements R3FResourceCache {
   preload<I extends GuardedLoaderInput, L extends LoaderRepresentation>(
     loader: L,
     input: I,
-    extensions?: Extensions<L>,
+    extensions?: GuardedLoaderExtensions<L>,
   ): void {
-    this.prepare(loader, input)
-    useLoader.preload(loader, input, this.composeExtensions(loader, extensions))
+    const entry = this.prepare(loader, input)
+    useLoader.preload(
+      entry.r3fLoader,
+      input,
+      this.composeExtensions<L>(entry, extensions),
+    )
   }
 
   evict<I extends GuardedLoaderInput, L extends LoaderRepresentation>(loader: L, input: I): void {
-    useLoader.clear(loader, input)
     const key = requestKey(input)
     const entries = this.entries.get(loader)
     const entry = entries?.get(key)
+    useLoader.clear(entry?.r3fLoader ?? r3fLoaderRepresentation(loader), input)
     if (!entry) return
 
     entry.status = 'evicted'
@@ -223,7 +252,10 @@ class R3FResourceCacheImpl implements R3FResourceCache {
     return () => this.listeners.delete(listener)
   }
 
-  prepare<I extends GuardedLoaderInput, L extends LoaderRepresentation>(loader: L, input: I): void {
+  prepare<I extends GuardedLoaderInput, L extends LoaderRepresentation>(
+    loader: L,
+    input: I,
+  ): CacheEntry {
     const key = requestKey(input)
     let entries = this.entries.get(loader)
     if (!entries) {
@@ -232,52 +264,55 @@ class R3FResourceCacheImpl implements R3FResourceCache {
     }
     const existing = entries.get(key)
     if (existing) {
-      if (existing.status !== 'error') return
+      if (existing.status !== 'error') return existing
       entries.delete(key)
       this.releaseClaim(loader, key)
     }
 
     this.claim(loader, key)
     const parts = inputParts(input)
-    entries.set(key, {
+    const entry: CacheEntry = {
       loader,
+      r3fLoader: r3fLoaderRepresentation(loader),
       input,
       key,
       generation: this.generation++,
-      partKeys: new Set(parts.map(inputKey)),
       expectedParts: parts.length,
       resolvedParts: 0,
       resolvedRoots: new Set(),
       protections: [],
       status: parts.length === 0 ? 'ready' : 'loading',
-    })
+    }
+    entries.set(key, entry)
     this.emit()
+    return entry
   }
 
   composeExtensions<L extends LoaderRepresentation>(
-    representation: L,
-    extensions?: Extensions<L>,
-  ): Extensions<L> {
+    entry: CacheEntry,
+    extensions?: GuardedLoaderExtensions<L>,
+  ): (loader: LoaderLike) => void {
     return (loader) => {
-      extensions?.(loader)
-      instrumentLoader(loader, representation, this, {
-        capture: (input) => this.capture(representation, input),
-        resolve: (entry, result) => this.resolve(entry, result),
-        reject: (entry, error) => this.reject(entry, error),
+      extensions?.(loader as GuardedLoaderInstance<L>)
+      const generation = entry.generation
+      instrumentLoader(loader, {
+        entry,
+        generation,
+        parts: inputParts(entry.input),
+        nextPart: 0,
+        resolve: (result) => this.resolve(entry, generation, result),
+        reject: (error) => this.reject(entry, generation, error),
       })
     }
   }
 
-  private capture(loader: LoaderRepresentation, input: unknown): CacheEntry[] {
-    const key = inputKey(input)
-    return [...(this.entries.get(loader)?.values() ?? [])].filter(
-      (entry) => entry.status === 'loading' && entry.partKeys.has(key),
-    )
-  }
-
-  private resolve(entry: CacheEntry, result: unknown): void {
+  private resolve(entry: CacheEntry, generation: number, result: unknown): void {
     const current = this.entries.get(entry.loader)?.get(entry.key)
-    if (current !== entry || entry.status === 'evicted') {
+    if (
+      generation !== entry.generation
+      || current !== entry
+      || entry.status !== 'loading'
+    ) {
       const stale = this.registry.acquire(result as ResourceRoot, {
         ownership: 'owned',
         releasePolicy: 'microtask',
@@ -298,10 +333,14 @@ class R3FResourceCacheImpl implements R3FResourceCache {
     this.emit()
   }
 
-  private reject(entry: CacheEntry, error: unknown): void {
+  private reject(entry: CacheEntry, generation: number, error: unknown): void {
     const current = this.entries.get(entry.loader)?.get(entry.key)
-    if (current !== entry || entry.status === 'evicted') return
-    useLoader.clear(entry.loader, entry.input)
+    if (
+      generation !== entry.generation
+      || current !== entry
+      || entry.status === 'evicted'
+    ) return
+    useLoader.clear(entry.r3fLoader, entry.input)
     for (const protection of entry.protections.splice(0)) protection.release()
 
     entry.status = 'error'
@@ -388,15 +427,15 @@ export function useGuardedLoader<
 >(
   loader: L,
   input: I,
-  extensions?: Extensions<L>,
+  extensions?: GuardedLoaderExtensions<L>,
   onProgress?: (event: ProgressEvent<EventTarget>) => void,
 ): GuardedLoaderReturn<L, I> {
   const cache = asInternalCache(useR3FResourceCache())
-  cache.prepare(loader, input)
+  const entry = cache.prepare(loader, input)
   const result = useLoader(
-    loader,
+    entry.r3fLoader,
     input,
-    cache.composeExtensions(loader, extensions),
+    cache.composeExtensions<L>(entry, extensions),
     onProgress,
   )
 
