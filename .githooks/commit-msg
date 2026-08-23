@@ -1,0 +1,12 @@
+#!/bin/sh
+# Refuse a co-author trailer.
+#
+# Seven of them reached this repository's history and had to be removed with a
+# rewrite, which meant a force push and a published npm provenance attestation
+# pointing at a commit that no longer existed. Cheaper to refuse the commit.
+#
+# Enable once per clone: git config core.hooksPath .githooks
+if grep -qiE '^co-authored-by:' "$1"; then
+  echo "commit-msg: Co-Authored-By trailers are not used in this repository." >&2
+  exit 1
+fi

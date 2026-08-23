@@ -11,7 +11,7 @@ made.
 
 Suggested attribution:
 
-> Oskaras Margevicius, “three-dispose-guard WebGL lifecycle dataset”, versioned
+> Oskaras Margevicius, "three-dispose-guard WebGL lifecycle dataset", versioned
 > capture from https://github.com/OskarasM/three-dispose-guard.
 
 Identify the exact filename or `captureId` when citing a result. Schema-v2 captures

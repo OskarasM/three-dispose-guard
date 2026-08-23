@@ -33,7 +33,7 @@ only the CLI changes the kind to `provenance-complete-capture` and adds Git, loc
 
 The files [`2026-08-21-windows-chromium.json`](results/2026-08-21-windows-chromium.json) and [`2026-08-21-windows-chromium.csv`](results/2026-08-21-windows-chromium.csv) are the original schema-v1 reference. They remain unchanged for auditability.
 
-They contain five repeated unique-resource runs and one set of specialised proofs. Their “native” line is a declarative-style model, not actual R3F. Do not relabel these files as schema v2 or use them as evidence for the upgraded native comparison.
+They contain five repeated unique-resource runs and one set of specialised proofs. Their "native" line is a declarative-style model, not actual R3F. Do not relabel these files as schema v2 or use them as evidence for the upgraded native comparison.
 
 ## Generate a new capture
 

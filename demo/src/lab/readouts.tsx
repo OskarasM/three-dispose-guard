@@ -168,7 +168,7 @@ export function SuiteSummaryTable({ suite }: { suite: ResearchSuite }) {
             <tr key={variant}>
               <th scope="row">{variantMeta[variant].label}</th>
               <td>{suite.summary[variant].mean.toFixed(1)}</td>
-              <td>{suite.summary[variant].minimum}–{suite.summary[variant].maximum}</td>
+              <td>{suite.summary[variant].minimum}-{suite.summary[variant].maximum}</td>
               <td>{suite.summary[variant].variance.toFixed(2)}</td>
             </tr>
           ))}
