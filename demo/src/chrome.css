@@ -62,31 +62,18 @@
 .brand-mark {
   width: 24px;
   height: 24px;
-  position: relative;
-  display: grid;
-  place-items: center;
-  border: 1px solid #64705f;
-  border-radius: 50%;
-}
-
-.brand-mark::before,
-.brand-mark::after,
-.brand-mark span {
-  content: "";
-  position: absolute;
-  border-radius: 50%;
-}
-
-.brand-mark::before {
-  width: 12px;
-  height: 12px;
-  border: 1px solid var(--acid);
-}
-
-.brand-mark::after {
-  width: 4px;
-  height: 4px;
+  flex: 0 0 auto;
   background: var(--acid);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%224%22%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2226%22%2F%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2214%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%225%22%20fill%3D%22%23000%22%2F%3E%3C%2Fsvg%3E") no-repeat center / contain;
+  mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%224%22%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2226%22%2F%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2214%22%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%225%22%20fill%3D%22%23000%22%2F%3E%3C%2Fsvg%3E") no-repeat center / contain;
+}
+
+/* Same geometry as public/favicon.svg, tinted by one token, so the mark in the
+   tab and the mark in the header cannot drift. Drawn as three nested CSS
+   circles before this, whose outer ring had gone grey while the favicon's
+   stayed acid. */
+.brand-mark span {
+  display: none;
 }
 
 .site-header nav {
