@@ -235,8 +235,14 @@ test('@smoke the self-hosted typefaces actually load', async ({ page }) => {
   const faces = await page.evaluate(() =>
     [...document.fonts].map((face) => ({ family: face.family, status: face.status })),
   )
+  // Firefox reports the family with the quotes from the @font-face descriptor
+  // still attached, so it answers "Archivo" where Chromium and WebKit answer
+  // Archivo. Strip them before comparing or this passes in two browsers and
+  // fails in the third for no reason to do with fonts.
   const loaded = (family: string) =>
-    faces.some((face) => face.family === family && face.status === 'loaded')
+    faces.some(
+      (face) => face.family.replace(/^["']|["']$/g, '') === family && face.status === 'loaded',
+    )
 
   expect(loaded('Archivo'), `display face missing. Present: ${JSON.stringify(faces)}`).toBe(true)
   expect(loaded('Atkinson Next'), 'body face missing').toBe(true)
