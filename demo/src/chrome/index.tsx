@@ -140,7 +140,9 @@ export function InstallCommand({ command, id = 'install-command' }: { command: s
 
   return (
     <div className="install-command">
-      <code id={id}>{command}</code>
+      {/* Focusable because it scrolls horizontally on a narrow screen, and a
+          scrollable region a keyboard cannot reach is a WCAG 2.1.1 failure. */}
+      <code id={id} tabIndex={0}>{command}</code>
       <button className="copy-button" type="button" aria-describedby={id} onClick={copy}>
         <CopyIcon /> {status === 'copied' ? 'Copied' : status === 'failed' ? 'Copy failed' : 'Copy'}
       </button>
