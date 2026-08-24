@@ -61,7 +61,7 @@ export function MemoryChart({ series, running }: MemoryChartProps) {
       {all.length === 0 && (
         <div className="chart-empty">
           <span className="chart-empty-mark">06</span>
-          <p>{running ? 'Running the selected WebGL proof…' : 'Select a scenario, then run its proof'}</p>
+          <p>{running ? 'Running the selected WebGL proof...' : 'Select a scenario, then run its proof'}</p>
         </div>
       )}
       <div className="chart-axis-label chart-axis-y">Three.js resources</div>

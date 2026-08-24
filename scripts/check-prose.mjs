@@ -2,8 +2,10 @@
 //
 // Two rules, both easy to break by accident and both visible to anyone who reads the repo:
 //
-// 1. No em-dashes, en-dashes or smart quotes. They arrive invisibly through copy and paste
-//    and then turn up mangled in a terminal or a diff.
+// 1. No em-dashes, en-dashes, smart quotes or a single-character ellipsis. They arrive
+//    invisibly through copy and paste and then turn up mangled in a terminal or a diff.
+//    The ellipsis was the one that got through: two of these repositories were shipping
+//    a U+2026 in a button label because the rule listed dashes and quotes and stopped.
 // 2. British spellings in prose. CSS property names, Three.js API names and package names
 //    are American by definition and are skipped by extension rather than by exception list,
 //    so the check does not need updating every time a new colour property appears.
@@ -19,7 +21,7 @@ const SKIP_DIRS = new Set(['node_modules', 'dist', 'site-dist', '.git', 'results
 // spellings are language keywords, not prose.
 const PROSE_EXTENSIONS = new Set(['.md', '.ts', '.tsx', '.mjs', '.js'])
 
-const NON_ASCII_PUNCTUATION = /[–—‘’“”]/
+const NON_ASCII_PUNCTUATION = /[–—‘’“”…]/
 const AMERICAN =
   /\b(behavior|behaviors|optimize|optimized|optimization|organize|organized|analyze|analyzed|customize|customized|recognize|recognized)\b/i
 

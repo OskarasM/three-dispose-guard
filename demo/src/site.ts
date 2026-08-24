@@ -12,7 +12,7 @@ export const R3F_GUIDE_URL = `${REPO_URL}/blob/main/docs/r3f-guide.md`
 
 export const variantMeta: Record<BenchmarkVariant, { label: string; className: string }> = {
   unmanaged: { label: 'unmanaged', className: 'series-unmanaged' },
-  naive: { label: 'naïve eager', className: 'series-naive' },
+  naive: { label: 'naive eager', className: 'series-naive' },
   native: { label: 'native R3F', className: 'series-native' },
   guarded: { label: 'Dispose Guard', className: 'series-guarded' },
 }

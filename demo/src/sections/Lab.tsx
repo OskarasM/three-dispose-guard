@@ -83,7 +83,7 @@ export function Lab({
             onClick={onRun}
             disabled={running || suiteRunning}
           >
-            {running ? 'Running proof…' : 'Run selected proof'}
+            {running ? 'Running proof...' : 'Run selected proof'}
             {!running && <ArrowIcon />}
           </button>
         </article>
