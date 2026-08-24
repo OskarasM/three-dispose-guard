@@ -40,6 +40,11 @@ export default defineConfig({
     ],
   },
   build: {
+    // The deployed bundle is the only copy of this code most people will ever
+    // open, and without maps it is one minified line. These are projects whose
+    // whole argument is that the work should be readable, so they ship the maps
+    // that make it readable in a browser as well as on GitHub.
+    sourcemap: true,
     outDir: '../site-dist',
     emptyOutDir: true,
   },

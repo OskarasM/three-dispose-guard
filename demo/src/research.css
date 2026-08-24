@@ -641,13 +641,17 @@
   background: #0e110f;
 }
 
+/* 13px, not 11px. Eleven is a chrome size, and this is not chrome: it is the
+   code somebody is meant to read and retype. Lighthouse flagged it, and it was
+   right to. The same defect was in scene-narrator, one step worse, because two
+   font-size rules compounded there. */
 .quickstart-code pre {
   margin: 0;
   padding: 28px;
   overflow-x: auto;
   color: #cad1c9;
-  font-size: 11px;
-  line-height: 1.85;
+  font-size: 13px;
+  line-height: 1.75;
 }
 
 .limits {
