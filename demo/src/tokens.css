@@ -82,6 +82,10 @@
   --z-sticky: 20;
   --z-overlay: 40;
   --z-modal: 50;
+  /* Above everything, because it is the one control that has to be reachable
+     when something else has gone wrong. It was a bare 100 in chrome.css, which
+     is exactly the arbitrary number this scale exists to stop. */
+  --z-skip: 60;
 
   /* Names the existing stylesheet already uses. Kept as aliases so the port is
      incremental rather than one unreviewable diff. New rules use the shared

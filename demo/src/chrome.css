@@ -22,7 +22,7 @@
 
 .skip-link {
   position: fixed;
-  z-index: 100;
+  z-index: var(--z-skip);
   top: 10px;
   left: 10px;
   padding: 12px 16px;
@@ -185,13 +185,17 @@
   opacity: 0.72;
 }
 
+/* The one round thing and the one box-shadow on any of these three sites, and
+   both are readings of the same object: a status LED. The shadow has zero blur
+   and zero offset, so it is a ring rather than a shadow and fakes no depth,
+   which is what the no-shadow rule is actually about. */
 .live-dot {
   width: 7px;
   height: 7px;
   flex: 0 0 auto;
   border-radius: 50%;
   background: var(--acid);
-  box-shadow: 0 0 0 4px rgba(216, 255, 83, 0.12);
+  box-shadow: 0 0 0 4px var(--accent-wash);
 }
 
 .section-heading {
