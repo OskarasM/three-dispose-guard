@@ -1,0 +1,5 @@
+# This is a demo for a public library and every page on it is meant to be found.
+User-agent: *
+Allow: /
+
+Sitemap: https://three-dispose-guard.vercel.app/sitemap.xml
