@@ -40,7 +40,7 @@ Schema v2 records the exact package versions from `package-lock.json`, Git commi
 
 A unique geometry, material and texture set is created and rendered each cycle. The object is removed from the scene without calling `dispose()`. This intentionally reproduces retained Three.js resources.
 
-### Naïve eager disposal
+### Naive eager disposal
 
 Every collected resource is disposed immediately after its object unmounts. This is valid for unique resources but unsafe for a resource still used elsewhere.
 
@@ -72,7 +72,7 @@ The files dated 21 August 2026 were captured before schema v2 and are retained u
 | Strategy | Five final totals | Mean | Variance |
 |---|---:|---:|---:|
 | Unmanaged | 401, 401, 401, 401, 401 | 401 | 0 |
-| Naïve eager | 1, 1, 1, 1, 1 | 1 | 0 |
+| Naive eager | 1, 1, 1, 1, 1 | 1 | 0 |
 | Declarative-style model | 1, 1, 1, 1, 1 | 1 | 0 |
 | Dispose Guard | 1, 1, 1, 1, 1 | 1 | 0 |
 

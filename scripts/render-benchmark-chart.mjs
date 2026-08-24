@@ -7,7 +7,7 @@ const report = JSON.parse(await readFile(path.join(root, source), 'utf8'))
 const isSchemaV2 = report.schemaVersion >= 2
 const variants = [
   ['unmanaged', 'UNMANAGED', '#ff6545'],
-  ['naive', 'NAÏVE EAGER', '#cf9bff'],
+  ['naive', 'NAIVE EAGER', '#cf9bff'],
   ['native', isSchemaV2 ? 'NATIVE R3F' : 'DECLARATIVE-STYLE', '#7da8ff'],
   ['guarded', 'DISPOSE GUARD', '#d8ff53'],
 ]
@@ -65,8 +65,8 @@ const ticks = [0, 100, 200, 300, 400].map((value) => {
 }).join('\n')
 
 const description = isSchemaV2
-  ? `Unmanaged finishes at ${report.summary.unmanaged.mean}. Naïve eager finishes at ${report.summary.naive.mean}, native R3F at ${report.summary.native.mean}, and Dispose Guard at ${report.summary.guarded.mean}.`
-  : 'Unmanaged resources rise to 401. Naïve eager, declarative-style and Dispose Guard each finish at 1 with zero variance for unique resources.'
+  ? `Unmanaged finishes at ${report.summary.unmanaged.mean}. Naive eager finishes at ${report.summary.naive.mean}, native R3F at ${report.summary.native.mean}, and Dispose Guard at ${report.summary.guarded.mean}.`
+  : 'Unmanaged resources rise to 401. Naive eager, declarative-style and Dispose Guard each finish at 1 with zero variance for unique resources.'
 const footer = isSchemaV2
   ? [
       report.environment?.os,

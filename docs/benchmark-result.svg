@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560" role="img" aria-labelledby="title desc">
   <title id="title">Measured Three.js resource counts over five 50-cycle runs</title>
-  <desc id="desc">Unmanaged resources rise to 401. Naïve eager, declarative-style and Dispose Guard each finish at 1 with zero variance for unique resources.</desc>
+  <desc id="desc">Unmanaged resources rise to 401. Naive eager, declarative-style and Dispose Guard each finish at 1 with zero variance for unique resources.</desc>
   <rect width="1200" height="560" fill="#0b0d0c"/>
   <g font-family="ui-monospace, SFMono-Regular, Consolas, monospace">
     <text x="64" y="58" fill="#f3f5ee" font-size="22" font-weight="700">Five-run WebGL allocation study</text>
@@ -17,7 +17,7 @@
 <text x="626" y="67" fill="#f3f5ee" font-size="12">UNMANAGED 401</text>
 <polyline points="90.0,449.3 110.8,449.3 131.6,449.3 152.4,449.3 173.3,449.3 194.1,449.3 214.9,449.3 235.7,449.3 256.5,449.3 277.3,449.3 298.2,449.3 319.0,449.3 339.8,449.3 360.6,449.3 381.4,449.3 402.2,449.3 423.1,449.3 443.9,449.3 464.7,449.3 485.5,449.3 506.3,449.3 527.1,449.3 548.0,449.3 568.8,449.3 589.6,449.3 610.4,449.3 631.2,449.3 652.0,449.3 672.9,449.3 693.7,449.3 714.5,449.3 735.3,449.3 756.1,449.3 776.9,449.3 797.8,449.3 818.6,449.3 839.4,449.3 860.2,449.3 881.0,449.3 901.8,449.3 922.7,449.3 943.5,449.3 964.3,449.3 985.1,449.3 1005.9,449.3 1026.7,449.3 1047.6,449.3 1068.4,449.3 1089.2,449.3 1110.0,449.3" fill="none" stroke="#cf9bff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
 <line x1="860" y1="62" x2="894" y2="62" stroke="#cf9bff" stroke-width="4"/>
-<text x="906" y="67" fill="#f3f5ee" font-size="12">NAÏVE EAGER 1</text>
+<text x="906" y="67" fill="#f3f5ee" font-size="12">NAIVE EAGER 1</text>
 <polyline points="90.0,449.3 110.8,449.3 131.6,449.3 152.4,449.3 173.3,449.3 194.1,449.3 214.9,449.3 235.7,449.3 256.5,449.3 277.3,449.3 298.2,449.3 319.0,449.3 339.8,449.3 360.6,449.3 381.4,449.3 402.2,449.3 423.1,449.3 443.9,449.3 464.7,449.3 485.5,449.3 506.3,449.3 527.1,449.3 548.0,449.3 568.8,449.3 589.6,449.3 610.4,449.3 631.2,449.3 652.0,449.3 672.9,449.3 693.7,449.3 714.5,449.3 735.3,449.3 756.1,449.3 776.9,449.3 797.8,449.3 818.6,449.3 839.4,449.3 860.2,449.3 881.0,449.3 901.8,449.3 922.7,449.3 943.5,449.3 964.3,449.3 985.1,449.3 1005.9,449.3 1026.7,449.3 1047.6,449.3 1068.4,449.3 1089.2,449.3 1110.0,449.3" fill="none" stroke="#7da8ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
 <line x1="580" y1="96" x2="614" y2="96" stroke="#7da8ff" stroke-width="4"/>
 <text x="626" y="101" fill="#f3f5ee" font-size="12">DECLARATIVE-STYLE 1</text>

@@ -132,7 +132,7 @@ The committed reference run was captured on 21 August 2026 using Chromium 151, W
 | Strategy | Final resources in each run | Mean | Variance |
 |---|---:|---:|---:|
 | Unmanaged | 401, 401, 401, 401, 401 | 401 | 0 |
-| Naïve eager disposal | 1, 1, 1, 1, 1 | 1 | 0 |
+| Naive eager disposal | 1, 1, 1, 1, 1 | 1 | 0 |
 | Declarative-style disposal | 1, 1, 1, 1, 1 | 1 | 0 |
 | Dispose Guard | 1, 1, 1, 1, 1 | 1 | 0 |
 
