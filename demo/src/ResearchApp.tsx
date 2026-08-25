@@ -26,7 +26,7 @@ const NAV = [
 ] as const
 
 const SIBLING_SITES = [
-  { href: 'https://scene-narrator-inky.vercel.app', label: 'scene-narrator' },
+  { href: 'https://scene-narrator-demo.vercel.app', label: 'scene-narrator' },
   { href: 'https://realtime-3d-room.vercel.app', label: 'realtime-3d-room' },
 ] as const
 

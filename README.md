@@ -274,7 +274,7 @@ Two other pieces of the same problem, built in the open:
 
 - [scene-narrator](https://github.com/OskarasM/scene-narrator) makes a moving
   Three.js scene usable with a screen reader without spending the frame budget
-  on it. [Demo](https://scene-narrator-inky.vercel.app)
+  on it. [Demo](https://scene-narrator-demo.vercel.app)
 - [realtime-3d-room](https://github.com/OskarasM/realtime-3d-room) is a shared
   3D room over Supabase Realtime, with a written guide to why presence cannot
   carry position. [Demo](https://realtime-3d-room.vercel.app)
