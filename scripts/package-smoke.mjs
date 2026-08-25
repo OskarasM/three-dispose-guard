@@ -47,7 +47,15 @@ function run(command, args, options = {}) {
   return result.stdout
 }
 
-assert.equal(packageJson.version, '0.1.0')
+// A shape check, not a literal. Pinning the expected version here meant every
+// release had to edit this line, and forgetting to failed the release after the
+// build and the whole browser suite had already run. The tag is checked against
+// this same field in release.yml, which is where that comparison belongs.
+assert.match(
+  packageJson.version,
+  /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/,
+  `Version is not semver: ${packageJson.version}`,
+)
 assert.equal(packageJson.sideEffects, false)
 assert.equal(
   Object.keys(packageJson.dependencies ?? {}).length,
