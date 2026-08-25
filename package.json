@@ -1,6 +1,6 @@
 {
   "name": "three-dispose-guard",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Audit-first ownership and safe disposal for shared, cached and primitive Three.js resources.",
   "type": "module",
   "license": "MIT",

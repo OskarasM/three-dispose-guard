@@ -2,6 +2,23 @@
 
 All notable changes are documented here.
 
+## 0.1.1 - 2026-08-25
+
+No change to the library. `src/` is untouched since 0.1.0, so the built `dist`
+in this tarball is identical to the one in 0.1.0.
+
+### Changed
+
+- README documents the demo, the prose and font-budget checks, and the sibling
+  projects, and points at the renamed scene-narrator demo.
+- Documentation spells "naive" one way throughout.
+
+### Fixed
+
+- Published provenance. The 0.1.0 attestation names a commit from before the
+  repository history was rewritten, so the source it points at is no longer in
+  this repository. This release is built and signed against current `main`.
+
 ## 0.1.0 - 2026-08-22
 
 ### Added
