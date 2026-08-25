@@ -1,4 +1,4 @@
-<img src="demo/public/favicon.svg" alt="" width="56" height="56" align="left">
+<img src="demo/public/favicon.svg" alt="" width="52" height="52" />
 
 # three-dispose-guard
 
