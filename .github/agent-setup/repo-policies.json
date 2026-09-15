@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "repos": {
+    "realtime-3d-room": {
+      "claude": "local-only",
+      "delivery": "pr",
+      "reason": "Owner decision #3: public repository"
+    },
+    "three-dispose-guard": {
+      "claude": "local-only",
+      "delivery": "pr",
+      "reason": "Owner decision #3: public repository"
+    },
+    "scene-narrator": {
+      "claude": "local-only",
+      "delivery": "pr",
+      "history": "skip",
+      "reason": "Owner decision #3; history already clean"
+    },
+    "MarketingStudio": {
+      "claude": "tracked",
+      "delivery": "local",
+      "preserveProductAgents": true,
+      "reason": "No remote; owner decision #4 preserves product skills and docs"
+    },
+    "MarketingStudioCloud": {
+      "claude": "tracked",
+      "delivery": "pr",
+      "preserveProductAgents": true,
+      "reason": "Owner decision #4 preserves product skills and docs"
+    },
+    "ai-job-search": {
+      "claude": "tracked",
+      "delivery": "pr",
+      "preserveProductAgents": true,
+      "history": "skip",
+      "reason": "Owner decisions #4 and #5 preserve product content and upstream history"
+    }
+  }
+}

@@ -23,6 +23,8 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
+      - name: Agent contract (vendored checker, see .github/agent-setup/SOURCE.md)
+        run: node .github/agent-setup/check.mjs --ci --repo-id three-dispose-guard .
       - run: npm ci
       - run: npm run check
       - run: npm run package:check
