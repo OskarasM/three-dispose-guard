@@ -154,7 +154,8 @@ for (const file of exportFiles) {
   assert.ok(packedPaths.has(file.replace(/^\.\//, '')), `Packed package is missing ${file}`)
 }
 
-for (const forbidden of ['src/', 'demo/', 'tests/', 'benchmarks/']) {
+// The docs directory ships, but the project's working docs (state, roadmap, decisions) do not.
+for (const forbidden of ['src/', 'demo/', 'tests/', 'benchmarks/', 'docs/STATE.md', 'docs/ROADMAP.md', 'docs/DECISIONS.md']) {
   assert.equal(
     [...packedPaths].some((file) => file.startsWith(forbidden)),
     false,
