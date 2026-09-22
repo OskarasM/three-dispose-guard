@@ -590,7 +590,7 @@ export function mountHeroScene(
   const advance = () => {
     step = (step + 1) % (CONSUMERS + 1)
     if (step === 0) {
-      // ponytail: reacquiring after the registry disposed the asset makes
+      // Note: reacquiring after the registry disposed the asset makes
       // Three.js re-upload it from the JS-side attributes, so this loop churns
       // one small geometry and one 8x8 texture every cycle. That is the honest
       // consequence of the thing being demonstrated, and at this size it is

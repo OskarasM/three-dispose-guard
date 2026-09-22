@@ -28,6 +28,9 @@
   "files": [
     "dist",
     "docs",
+    "!docs/STATE.md",
+    "!docs/ROADMAP.md",
+    "!docs/DECISIONS.md",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"

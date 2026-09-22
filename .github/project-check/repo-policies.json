@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "repos": {
+    "three-dispose-guard": {
+      "claude": "local-only",
+      "delivery": "pr",
+      "reason": "Owner decision #3: public repository"
+    }
+  }
+}
