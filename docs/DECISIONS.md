@@ -35,12 +35,11 @@ Rows dated before 2026-09-15 index choices already written in this repository (c
 | 2026-08-25 | Cut 0.1.1 with no library change to restore published provenance after the history rewrite. | Implemented | CHANGELOG.md 0.1.1; commit 98b0d68. |
 | 2026-08-25 | Refuse co-author trailers with a commit-msg hook, and recreate the GitHub repository to drop pull requests that still carried them. | Implemented | .githooks/commit-msg; commit fb0c29a (Vercel production deployment confirmed against it). |
 
-## Agent setup
+## Project setup
 
 | Date | Decision | Status | Reason / evidence |
 |---|---|---|---|
-| 2026-09-15 | AGENTS.md is the shared agent contract (seven sections, checked in CI by a vendored checker in .github/agent-setup/); docs/STATE.md, docs/ROADMAP.md and this file hold current state, plan and decisions; CHANGELOG.md stays the release history. | Accepted (owner) | Owner-approved setup pattern; checker source and hashes in .github/agent-setup/SOURCE.md. |
-| 2026-09-15 | CLAUDE.md is local-only in this public repository (excluded via .git/info/exclude); CI does not require it. | Accepted (owner) | Owner decision for public repositories. |
-| 2026-09-15 | The contract checker runs as a step in the existing required Node/OS compatibility jobs instead of a new job. | Accepted (agent proposal) | A new job would not be a required status check under current branch protection; the step also exercises the checker on Windows and Node 20. |
-| 2026-09-15 | scripts/check-prose.mjs skips `agent-setup` directories. | Accepted (agent proposal) | The vendored checker must stay byte-identical to its source hash and contains an American spelling. |
-| 2026-09-15 | docs/STATE.md, docs/ROADMAP.md and docs/DECISIONS.md are excluded from the npm tarball (package.json `files` negations), asserted by scripts/package-smoke.mjs. | Accepted (agent proposal) | `docs/` ships as published guides; working project docs are not package content. |
+| 2026-09-15 | AGENTS.md is the shared project contract (seven sections, checked in CI by a vendored checker in .github/project-check/); docs/STATE.md, docs/ROADMAP.md and this file hold current state, plan and decisions; CHANGELOG.md stays the release history. | Accepted (owner) | Owner-approved setup pattern; checker source and hashes in .github/project-check/SOURCE.md. |
+| 2026-09-15 | The contract checker runs as a step in the existing required Node/OS compatibility jobs instead of a new job. | Accepted (proposal) | A new job would not be a required status check under current branch protection; the step also exercises the checker on Windows and Node 20. |
+| 2026-09-15 | scripts/check-prose.mjs skips `project-check` directories. | Accepted (proposal) | The vendored checker must stay byte-identical to its source hash and contains an American spelling. |
+| 2026-09-15 | docs/STATE.md, docs/ROADMAP.md and docs/DECISIONS.md are excluded from the npm tarball (package.json `files` negations), asserted by scripts/package-smoke.mjs. | Accepted (proposal) | `docs/` ships as published guides; working project docs are not package content. |

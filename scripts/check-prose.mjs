@@ -16,8 +16,8 @@ import { readFileSync } from 'node:fs'
 import { readdir } from 'node:fs/promises'
 import { extname, join } from 'node:path'
 
-// agent-setup holds a vendored checker whose bytes must match its source hash, so it is not ours to respell.
-const SKIP_DIRS = new Set(['node_modules', 'dist', 'site-dist', '.git', 'results', '.vite', '.vercel', 'test-results', 'playwright-report', 'agent-setup'])
+// project-check holds a vendored checker whose bytes must match its source hash, so it is not ours to respell.
+const SKIP_DIRS = new Set(['node_modules', 'dist', 'site-dist', '.git', 'results', '.vite', '.vercel', 'test-results', 'playwright-report', 'project-check'])
 // Prose lives in these. CSS, JSON lockfiles and HTML are excluded because their American
 // spellings are language keywords, not prose.
 const PROSE_EXTENSIONS = new Set(['.md', '.ts', '.tsx', '.mjs', '.js'])

@@ -34,7 +34,7 @@ export function policyFor(id) {
         (p.preserveProductAgents !== undefined && typeof p.preserveProductAgents !== 'boolean') ||
         (p.history !== undefined && p.history !== 'skip')) throw new Error(`invalid policy for ${name}`);
   }
-  return { claude: 'tracked', delivery: 'pr', preserveProductAgents: false, ...data.repos[id] };
+  return { claude: 'local-only', delivery: 'pr', preserveProductAgents: false, ...data.repos[id] };
 }
 function imports(file, errors, seen = new Set()) {
   if (seen.has(file)) return;
@@ -155,7 +155,7 @@ export function inspect(repo, options = {}) {
       if (claude.includes('{{')) errors.push('CLAUDE.md has unfilled {{placeholders}}');
       imports(path.join(repo, 'CLAUDE.md'), errors);
     }
-    if (policy.claude === 'local-only' && tracked.includes('CLAUDE.md')) errors.push('CLAUDE.md must be local-only under the named public-repo policy');
+    if (policy.claude === 'local-only' && tracked.includes('CLAUDE.md')) errors.push('CLAUDE.md must be local-only (untracked) under this repo policy');
     for (const [file, [cap, headings]] of Object.entries(DOCS)) {
       const body = read(path.join(repo, file));
       if (body === null) { errors.push(`${file} missing (template: templates/${file})`); continue; }

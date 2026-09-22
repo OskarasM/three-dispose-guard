@@ -1,6 +1,6 @@
 # three-dispose-guard
 
-Shared instructions for Codex, Claude Code and other repository agents. Current user instructions override these repository defaults. Observed code, configuration and verified live state override stale descriptions; reconcile the documents when they disagree.
+Shared project instructions for contributors and coding tools. Current user instructions override these repository defaults. Observed code, configuration and verified live state override stale descriptions; reconcile the documents when they disagree.
 
 ## Product
 
@@ -39,7 +39,7 @@ Run from the repository root; package.json scripts are the source of truth.
 - Benchmark chart (regenerates docs/benchmark-result.svg from JSON): `npm run benchmark:chart`
 - Release gate: `npm run release:check`
 - Regenerate icons from the one source mark: `npm run icons`
-- Agent contract check (vendored, see .github/agent-setup/SOURCE.md): `node .github/agent-setup/check.mjs --ci --repo-id three-dispose-guard .`
+- Project contract check (vendored, see .github/project-check/SOURCE.md): `node .github/project-check/check.mjs --ci --repo-id three-dispose-guard .`
 - Playwright starts its own server on port 4173 and refuses a busy port; set `THREE_DISPOSE_GUARD_TEST_PORT` to use another.
 
 ## Conventions
@@ -47,7 +47,7 @@ Run from the repository root; package.json scripts are the source of truth.
 Branches, commits and release:
 - Default branch `main` is protected: 8 required CI checks (4 Node/OS jobs, 2 R3F compatibility jobs, `browser`, `benchmark-data`). Work on a branch and merge by PR only after CI and the Vercel preview pass. A merge to `main` deploys the production lab.
 - This repository is public. Never commit tokens, project IDs, registry credentials, private paths or personal details. Report vulnerabilities through private security advisories (SECURITY.md).
-- No co-author or AI attribution trailers. Enable the hook once per clone: `git config core.hooksPath .githooks`. The history was rewritten once to remove such trailers; published provenance must not be broken again, so never rewrite pushed history.
+- No co-author trailers. Enable the hook once per clone: `git config core.hooksPath .githooks`. The history was rewritten once to remove such trailers; published provenance must not be broken again, so never rewrite pushed history.
 - Release only through a `v*` tag matching package.json (docs/release.md). Trusted publishing matches owner `OskarasM`, repository `three-dispose-guard`, workflow `release.yml`, environment `npm`; keep all four in step. Never add `NODE_AUTH_TOKEN` or a classic or long-lived token. Existing tags `v0.1.0` and `v0.1.1` are published; never move or delete them.
 
 Code and tests (from CONTRIBUTING.md):
@@ -90,7 +90,7 @@ Work is done only when these pass, run in this order, output read. `npm run chec
 - Before opening a pull request (CONTRIBUTING.md): also `npm run package:check`, `npm run benchmark:chart` with no resulting diff in docs/benchmark-result.svg, and `npm pack --dry-run`.
 - Peer-range or R3F change: CI's React 18 / R3F 8 / Three 0.163 job must pass; it is not run locally by default.
 - Release: `npm run release:check` from a clean checkout with all three browsers installed, then the steps in docs/release.md.
-- Docs-only change: `npm run check:prose`, links, consistency with package.json scripts and CI, `git diff --check`, and the agent contract check.
+- Docs-only change: `npm run check:prose`, links, consistency with package.json scripts and CI, `git diff --check`, and the project contract check.
 - Update only project docs whose facts changed: `docs/STATE.md` (Now, blockers, Last verified, Updated date), `docs/DECISIONS.md` (new or changed decisions with reason), `docs/ROADMAP.md` (items moved or added), a `CHANGELOG.md` entry for user-visible changes in a release.
 - Report which checks ran and their result. Never skip, weaken, or delete a check to make it pass.
 
